@@ -1,8 +1,32 @@
 import { PrismaClient } from "@prisma/client";
 import { Router } from "express";
 
+import fs from "fs";
+import multer from "multer";
+import path from "path";
+
 const prisma = new PrismaClient();
 const router = Router();
+
+const uploadDir = path.join(__dirname, "../uploads/covers");
+fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname || "");
+        cb(null, `${Date.now()}${ext || ".png"}`);
+    },
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith("image/")) return cb(new Error("Only images allowed"));
+        cb(null, true);
+    },
+});
 
 /**
  * @swagger
@@ -103,22 +127,33 @@ router.get("/:id", async (req, res) => {
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               title: { type: string }
- *               coverUrl: { type: string }
+ *               cover:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200: { description: OK }
  *       404: { description: Not found }
  */
-router.patch("/:id", async (req, res) => {
-    const { title, coverUrl } = req.body;
+router.patch("/:id", upload.single("cover"), async (req, res) => {
+    const { title } = req.body as { title?: string };
+    const file = req.file;
+
+    // If an image was uploaded, build a URL we can serve back to the FE
+    const coverUrl = file ? `/uploads/covers/${file.filename}` : undefined;
+
     try {
         const updated = await prisma.playlist.update({
             where: { id: req.params.id },
-            data: { title, coverUrl, updatedAt: new Date() },
+            data: {
+                ...(title !== undefined ? { title } : {}),
+                ...(coverUrl ? { coverUrl } : {}),
+                updatedAt: new Date(),
+            },
         });
         res.json(updated);
     } catch {
