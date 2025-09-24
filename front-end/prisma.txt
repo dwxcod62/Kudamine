@@ -1,0 +1,128 @@
+// schema.prisma
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client { provider = "prisma-client-js" }
+
+enum Unit { kg lb }
+enum SpendingStatus { Done Process Skip }
+
+model User {
+  id           String         @id @default(uuid())
+  email        String?        @unique
+  name         String?
+  createdAt    DateTime       @default(now())
+  settings     UserSettings?
+  gymDays      GymDay[]
+  gymPresets   GymPreset[]
+  playlists    Playlist[]
+  spendTemplates SpendingTemplate[]
+  spendEntries SpendingEntry[]
+}
+
+model UserSettings {
+  userId   String  @id
+  unit     Unit    @default(kg)
+  updatedAt DateTime @default(now())
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GymDay {
+  id        String     @id @default(uuid())
+  userId    String
+  dateYmd   DateTime   @db.Date
+  done      Boolean    @default(false)
+  note      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  focus     GymDayFocus[]
+  exercises GymExercise[]
+
+  @@unique([userId, dateYmd])
+  @@index([userId, dateYmd])
+}
+
+model GymDayFocus {
+  dayId String
+  tag   String
+  day   GymDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  @@id([dayId, tag])
+}
+
+model GymExercise {
+  id        String   @id @default(uuid())
+  dayId     String
+  name      String
+  sets      Int
+  reps      Int
+  weightKg  Decimal   @db.Decimal(6,1)
+  note      String?
+  createdAt DateTime  @default(now())
+  day       GymDay    @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  @@index([dayId])
+}
+
+model GymPreset {
+  id      String @id @default(uuid())
+  userId  String
+  name    String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, name])
+}
+
+model Playlist {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  coverUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks    Track[]
+}
+
+model Track {
+  id         String   @id @default(uuid())
+  playlistId String
+  title      String
+  artist     String?
+  youtubeId  String
+  coverUrl   String?
+  liked      Boolean  @default(false)
+  durationS  Int?
+  addedAt    DateTime @default(now())
+  position   Int      @default(0)
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@index([playlistId, position])
+}
+
+model SpendingTemplate {
+  id            String   @id @default(uuid())
+  userId        String
+  title         String
+  defaultAmount Decimal? @db.Decimal(12,2)
+  defaultDueDay Int?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries       SpendingEntry[]
+
+  @@unique([userId, title])
+}
+
+model SpendingEntry {
+  id         String   @id @default(uuid())
+  userId     String
+  templateId String?
+  title      String
+  dueDate    DateTime @db.Date
+  amount     Decimal  @db.Decimal(12,2)
+  status     SpendingStatus @default(Process)
+  monthKey   String   @db.Char(7) // 'YYYY-MM'
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template   SpendingTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([userId, monthKey])
+  @@index([userId, dueDate])
+}
