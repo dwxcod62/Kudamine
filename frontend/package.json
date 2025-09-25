@@ -41,6 +41,6 @@
         "vite": "^7.1.7"
     },
     "scripts": {
-        "build": "tsc -b -p tsconfig.build.json && vite build"
+        "build": "tsc -b tsconfig.build.json && vite build"
     }
 }
