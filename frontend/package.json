@@ -5,9 +5,9 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc -b && vite build",
         "lint": "eslint .",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "build": "tsc -b tsconfig.build.json && vite build"
     },
     "dependencies": {
         "class-variance-authority": "^0.7.1",
@@ -39,8 +39,5 @@
         "typescript": "~5.8.3",
         "typescript-eslint": "^8.39.1",
         "vite": "^7.1.7"
-    },
-    "scripts": {
-        "build": "tsc -b tsconfig.build.json && vite build"
     }
 }
