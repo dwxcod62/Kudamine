@@ -11,20 +11,27 @@ import LoginPage from "./pages/LoginPage";
 import PlaylistPage from "./pages/PlaylistPage";
 import SettingsPage from "./pages/SettingsPage";
 import { SpendingPage } from "./pages/SpendingPage";
+import TestPage from "./pages/Test"; //
 
 export default function Kudamine() {
     const location = useLocation();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-    if (location.pathname === "/login") {
+    const BLANK_ROUTES = new Set<string>(["/login", "/test"]);
+
+    if (BLANK_ROUTES.has(location.pathname)) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[var(--bg-page)] text-slate-800 dark:text-slate-100">
+            <div className="min-h-screen flex items-center justify-center text-slate-800 dark:text-slate-100">
                 <DesignTokens />
-                <LoginPage />
+                <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/test" element={<TestPage />} />
+                </Routes>
             </div>
         );
     }
 
+    // Các route còn lại dùng layout có Sidebar + Header
     return (
         <div className="min-h-screen w-full bg-[var(--bg-page)] text-slate-800 dark:text-slate-100">
             <DesignTokens />
@@ -43,6 +50,7 @@ export default function Kudamine() {
                         <Route path="/gym" element={<GymLogPage />} />
                         <Route path="/investments" element={<InvestmentsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
+                        {/* đừng đặt /test ở nhóm này nữa */}
                         <Route path="*" element={<Navigate to="/spending" replace />} />
                     </Routes>
                 </div>

@@ -31,6 +31,9 @@ model User {
   playlists      Playlist[]
   spendTemplates SpendingTemplate[]
   spendEntries   SpendingEntry[]
+  Position       Position[]
+  WatchItem      WatchItem[]
+  PriceAlert     PriceAlert[]
 }
 
 model UserSettings {
@@ -143,4 +146,119 @@ model SpendingEntry {
 
   @@index([userId, monthKey])
   @@index([userId, dueDate])
+}
+
+// ========= Investments (no brokerage account) =========
+
+enum AssetClass {
+  Equity
+  Crypto
+  ETF
+  Forex
+  Other
+}
+
+enum Currency {
+  USD
+  VND
+  EUR
+  JPY
+  GBP
+  Other
+}
+
+model Security {
+  id         String     @id @default(uuid())
+  symbol     String     @db.VarChar(32) // e.g. AAPL, TSLA, BTCUSD
+  name       String?
+  assetClass AssetClass @default(Equity)
+  currency   Currency   @default(USD)
+  exchange   String? // NASDAQ, NYSE, BINANCE...
+  createdAt  DateTime   @default(now())
+
+  positions  Position[]
+  watchItems WatchItem[]
+  alerts     PriceAlert[]
+  prices     PriceSnapshot[]
+
+  @@unique([symbol, assetClass])
+  @@index([symbol])
+}
+
+model Position {
+  id          String   @id @default(uuid())
+  userId      String
+  securityId  String
+  qty         Decimal  @db.Decimal(18, 6) // hỗ trợ crypto lẻ
+  avgBuyPrice Decimal  @db.Decimal(18, 6)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  security Security @relation(fields: [securityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, securityId]) // 1 user - 1 position / security
+  @@index([userId])
+  @@index([securityId])
+}
+
+model WatchItem {
+  id         String   @id @default(uuid())
+  userId     String
+  securityId String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  security Security @relation(fields: [securityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, securityId]) // không trùng 1 mã trong watchlist
+  @@index([userId])
+}
+
+model PriceAlert {
+  id            String   @id @default(uuid())
+  userId        String
+  securityId    String
+  targetUp      Decimal? @db.Decimal(18, 6)
+  targetDown    Decimal? @db.Decimal(18, 6)
+  bandPct       Decimal  @default(0.001) @db.Decimal(8, 6) // 0.1% hysteresis
+  cooldownMs    Int      @default(15000)
+  notifyEnabled Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  security Security          @relation(fields: [securityId], references: [id], onDelete: Cascade)
+  logs     NotificationLog[]
+
+  @@index([userId])
+  @@index([securityId])
+  @@unique([userId, securityId])
+}
+
+model NotificationLog {
+  id      String   @id @default(uuid())
+  alertId String
+  firedAt DateTime @default(now())
+  side    String // "up" | "down"
+  price   Decimal  @db.Decimal(18, 6)
+  message String?
+
+  alert PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, firedAt])
+}
+
+model PriceSnapshot {
+  id         String   @id @default(uuid())
+  securityId String
+  ts         DateTime
+  price      Decimal  @db.Decimal(18, 6)
+  source     String?
+
+  security Security @relation(fields: [securityId], references: [id], onDelete: Cascade)
+
+  @@unique([securityId, ts])
+  @@index([securityId, ts])
 }

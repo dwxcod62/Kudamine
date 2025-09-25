@@ -47,6 +47,14 @@ export function DesignTokens() {
 
   --elev:         0 6px 20px rgba(0,0,0,.35);
   --elev-thin:    0 1px 0 rgba(255,255,255,.04);
+
+  --ok:    #34d399;
+  --warn:  #fbbf24;
+  --bad:   #f87171;
+
+  --ok-soft:   color-mix(in srgb, var(--ok) 22%, transparent);
+  --warn-soft: color-mix(in srgb, var(--warn) 22%, transparent);
+  --bad-soft:  color-mix(in srgb, var(--bad) 22%, transparent);
 }
 
 /* —— Optional: respect system theme on first load —— */
