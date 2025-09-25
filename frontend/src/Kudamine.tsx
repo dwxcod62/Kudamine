@@ -9,7 +9,8 @@ import { GymLogPage } from "./pages/GymLogPage";
 import { InvestmentsPage } from "./pages/InvestmentPage";
 import LoginPage from "./pages/LoginPage";
 import PlaylistPage from "./pages/PlaylistPage";
-import { TransactionsPage } from "./pages/TransactionsPage";
+import SettingsPage from "./pages/SettingsPage";
+import { SpendingPage } from "./pages/SpendingPage";
 
 export default function Kudamine() {
     const location = useLocation();
@@ -37,10 +38,11 @@ export default function Kudamine() {
 
                     <Routes>
                         <Route path="/" element={<Navigate to="/spending" replace />} />
-                        <Route path="/spending" element={<TransactionsPage />} />
+                        <Route path="/spending" element={<SpendingPage />} />
                         <Route path="/playlist" element={<PlaylistPage />} />
                         <Route path="/gym" element={<GymLogPage />} />
                         <Route path="/investments" element={<InvestmentsPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
                         <Route path="*" element={<Navigate to="/spending" replace />} />
                     </Routes>
                 </div>
