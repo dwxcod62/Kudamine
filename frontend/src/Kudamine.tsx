@@ -6,7 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DesignTokens } from "./styles/DesignTokens";
 
 import { GymLogPage } from "./pages/GymLogPage";
-import { InvestmentsPage } from "./pages/InvestmentPage";
+import InvestmentsPage from "./pages/InvestmentPage";
 import LoginPage from "./pages/LoginPage";
 import PlaylistPage from "./pages/PlaylistPage";
 import SettingsPage from "./pages/SettingsPage";

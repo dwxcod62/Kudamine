@@ -16,7 +16,7 @@ const app = express();
  * - đọc từ env CORS_ORIGINS="http://localhost:5173,https://kudamine.vercel.app"
  * - thêm rule cho tất cả preview Vercel: *.vercel.app
  */
-const raw = process.env.CORS_ORIGINS ?? "http://localhost:5173,https://kudamine.vercel.app";
+const raw = process.env.CORS_ORIGINS ?? "http://localhost:5173,https://kudamine.vercel.app,https://kudamii.info,https://www.kudamii.info";
 const allowedOrigins = raw
     .split(",")
     .map((s) => s.trim())
