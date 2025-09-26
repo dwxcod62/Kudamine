@@ -3,6 +3,89 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { IconArrows, IconCard, IconChart, IconCog, IconGift, IconGrid, IconLifeRing, IconList, IconShield, IconTrend, Logo } from "./common/Icons";
 
+type Props = {
+    text?: string; // chuỗi mục tiêu
+    tickMs?: number; // thời gian mỗi lần đổi ký tự random
+    scrambleMs?: number; // tổng thời gian xoay cho 1 ký tự
+    pauseMs?: number; // dừng nhẹ giữa các ký tự
+};
+
+const lower = "abcdefghijklmnopqrstuvwxyz";
+const upper = lower.toUpperCase();
+
+function randLike(c: string) {
+    if (upper.includes(c)) return upper[Math.floor(Math.random() * upper.length)];
+    if (lower.includes(c)) return lower[Math.floor(Math.random() * lower.length)];
+    // với ký tự không phải chữ cái (dấu cách, dấu câu) thì giữ nguyên
+    return c;
+}
+
+export function RollingOneChar({ text = "kudamii", tickMs = 35, scrambleMs = 420, pauseMs = 60 }: Props) {
+    const target = text.split("");
+    const [display, setDisplay] = useState<string[]>(() => [...target]);
+    const idxRef = useRef(0);
+    const stopRef = useRef(false);
+
+    useEffect(() => {
+        stopRef.current = false;
+        setDisplay([...target]); // reset hiển thị ban đầu
+
+        async function loop() {
+            // vòng lặp vô hạn
+            while (!stopRef.current) {
+                const i = idxRef.current;
+
+                // xoay ký tự i trong khoảng scrambleMs
+                const start = Date.now();
+                // chụp snapshot để hạn chế setState nhiều phần tử
+                let base = [...target];
+
+                await new Promise<void>((resolve) => {
+                    const timer = setInterval(() => {
+                        if (stopRef.current) {
+                            clearInterval(timer);
+                            resolve();
+                            return;
+                        }
+                        const elapsed = Date.now() - start;
+                        if (elapsed >= scrambleMs) {
+                            // khóa về ký tự đúng
+                            base[i] = target[i];
+                            setDisplay(base);
+                            clearInterval(timer);
+                            resolve();
+                        } else {
+                            base[i] = randLike(target[i]);
+                            setDisplay(base);
+                            // NOTE: các vị trí khác vẫn là target (giữ nguyên)TE: các vị trí khác vẫn là target (giữ nguyên)
+                        }
+                    }, tickMs);
+                });
+
+                // dừng nhẹ giữa các ký tự
+                if (pauseMs > 0) {
+                    await new Promise((r) => setTimeout(r, pauseMs));
+                }
+
+                // sang ký tự kế tiếp, quay vòng
+                idxRef.current = (i + 1) % target.length;
+            }
+        }
+
+        loop();
+
+        return () => {
+            stopRef.current = true;
+        };
+    }, [tickMs, scrambleMs, pauseMs]);
+
+    return (
+        <div className="flex items-center justify-center min-h-[200px]">
+            <span className="font-mono text-5xl tracking-widest select-none">{display.join("")}</span>
+        </div>
+    );
+}
+
 type CurrentUser = {
     displayName?: string | null;
     email?: string | null;
@@ -126,7 +209,9 @@ export function Sidebar({ mobileOpen = false, onCloseMobile, currentUser, onSign
             {/* Desktop title row */}
             <div className="hidden lg:flex items-center gap-2 px-2 py-2">
                 <Logo />
-                <div className="font-extrabold tracking-tight">Kudamine</div>
+                <div className="font-extrabold tracking-tight">
+                    <RollingOneChar text="Kudamine" tickMs={35} scrambleMs={420} pauseMs={60} />
+                </div>
             </div>
 
             {/* Mobile personalized header */}
