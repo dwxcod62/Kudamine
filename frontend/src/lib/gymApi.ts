@@ -1,7 +1,9 @@
+// src/lib/gymApi.ts
+
 export type GymDay = {
     id: string;
     userId: string;
-    dateYmd: string; // ISO date (server trả về Date -> stringify/adapter)
+    dateYmd: string; // ISO date (server stringify)
     note: string | null;
     done: boolean;
     createdAt: string;
@@ -20,11 +22,14 @@ export type GymDay = {
 
 export type GymPreset = { id: string; userId: string; name: string };
 
-const BASE = "/gym"; // ví dụ bạn mount router tại app.use("/gym", r)
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:3000").replace(/\/+$/, "");
+const BASE = `${API_BASE}/gym`;
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
     const res = await fetch(input, {
         headers: { "Content-Type": "application/json" },
+        // Nếu bạn dùng session cookie, mở dòng sau:
+        // credentials: "include",
         ...init,
     });
     if (!res.ok) {
@@ -35,12 +40,30 @@ async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
 }
 
 export const GymApi = {
-    // Days
-    listDays: (userId: string, from?: string, to?: string) =>
-        http<GymDay[]>(`${BASE}/days?userId=${encodeURIComponent(userId)}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`),
+    /** ============ Days ============ */
 
+    /**
+     * Range "nhẹ": backend trả metadata (done, note, focus, có thể kèm _count.exercises),
+     * KHÔNG nhất thiết trả mảng exercises để load lịch nhanh.
+     */
+    listDays: (userId: string, fromIso?: string, toIso?: string) =>
+        http<GymDay[]>(
+            `${BASE}/days?userId=${encodeURIComponent(userId)}${fromIso ? `&from=${encodeURIComponent(fromIso)}` : ""}${
+                toIso ? `&to=${encodeURIComponent(toIso)}` : ""
+            }`
+        ),
+
+    /** Chi tiết 1 ngày: luôn include exercises trên backend */
     getDay: (id: string) => http<GymDay>(`${BASE}/days/${id}`),
 
+    /**
+     * Get-or-create theo date (backend dùng upsert).
+     * Dùng tên getOrCreateDay để rõ nghĩa, vẫn trỏ vào POST /days.
+     */
+    getOrCreateDay: (userId: string, dateYmd: string, note?: string, done?: boolean) =>
+        http<GymDay>(`${BASE}/days`, { method: "POST", body: JSON.stringify({ userId, dateYmd, note, done }) }),
+
+    /** Nếu vẫn muốn gọi trực tiếp create theo tên cũ, giữ alias */
     createDay: (payload: { userId: string; dateYmd: string; note?: string; done?: boolean }) =>
         http<GymDay>(`${BASE}/days`, { method: "POST", body: JSON.stringify(payload) }),
 
@@ -49,13 +72,18 @@ export const GymApi = {
 
     deleteDay: (id: string) => http<{ ok: true }>(`${BASE}/days/${id}`, { method: "DELETE" }),
 
-    // Focus
+    /** ============ Focus ============ */
+
     addFocus: (dayId: string, tags: string[]) =>
-        http<{ dayId: string; tag: string }[]>(`${BASE}/days/${dayId}/focus`, { method: "POST", body: JSON.stringify({ tags }) }),
+        http<{ dayId: string; tag: string }[]>(`${BASE}/days/${dayId}/focus`, {
+            method: "POST",
+            body: JSON.stringify({ tags }),
+        }),
 
     removeFocus: (dayId: string, tag: string) => http<{ ok: true }>(`${BASE}/days/${dayId}/focus/${encodeURIComponent(tag)}`, { method: "DELETE" }),
 
-    // Exercises
+    /** ============ Exercises ============ */
+
     addExercises: (dayId: string, items: { name: string; sets: number; reps: number; weightKg: number; note?: string }[]) =>
         http<any>(`${BASE}/days/${dayId}/exercises`, {
             method: "POST",
@@ -70,7 +98,8 @@ export const GymApi = {
 
     deleteExercise: (id: string) => http<{ ok: true }>(`${BASE}/exercises/${id}`, { method: "DELETE" }),
 
-    // Presets
+    /** ============ Presets ============ */
+
     listPresets: (userId: string) => http<GymPreset[]>(`${BASE}/presets?userId=${encodeURIComponent(userId)}`),
 
     createPreset: (userId: string, name: string) =>

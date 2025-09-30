@@ -1,10 +1,10 @@
 // src/pages/Gymlog.tsx
 import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Dumbbell, Pencil, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DayLogFE } from "../hooks/useGymData";
 import { useGymData } from "../hooks/useGymData";
 import { useAuthStore } from "../stores/auth";
+
 
 /** ================= Types (FE local) ================ */
 type Exercise = {
@@ -12,23 +12,26 @@ type Exercise = {
     name: string;
     sets: number;
     reps: number;
-    weight: number; // FE hiển thị theo unit, lưu/patch bằng kg
+    weight: number; // luôn quy đổi về kg trong FE
     note?: string | null;
 };
+
 type DaysDB = Record<string, DayLogFE>;
 type Unit = "kg" | "lb";
 
-/** =============== Date helpers (LOCAL) =============== */
-const ymdLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** =============== Constants =============== */
+const KEY_UNIT = "gym-unit.v1";
+const MUSCLE_PRESETS = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Push", "Pull", "Full Body"];
 
+/** =============== Date helpers =============== */
+const fmtISO = (d: Date) => d.toISOString().slice(0, 10);
 const parseISO = (s: string) => {
     const [y, m, dd] = s.split("-").map(Number);
     return new Date(y, (m ?? 1) - 1, dd ?? 1);
 };
-
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const startOfWeek = (d: Date) => addDays(d, -d.getDay()); // Sun
-const isSameDay = (a: Date, b: Date) => ymdLocal(a) === ymdLocal(b);
+const isSameDay = (a: Date, b: Date) => fmtISO(a) === fmtISO(b);
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
 const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
@@ -36,34 +39,6 @@ const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth()
 /** =============== Unit helpers =============== */
 const kgToLb = (kg: number) => Math.round(kg * 2.20462 * 10) / 10;
 const lbToKg = (lb: number) => Math.round((lb / 2.20462) * 10) / 10;
-
-/** =============== Normalizers =============== */
-const toYMD = (s: string) => s.slice(0, 10); // "YYYY-MM-DD" từ ISO full
-const norm = (s: string) => s.trim().toLowerCase();
-
-const mapApiDayToFE = (d: any): DayLogFE => ({
-    id: d.id,
-    date: toYMD(d.dateYmd),
-    done: !!d.done,
-    note: d.note ?? "",
-    focus: (d.focus ?? []).map((f: any) => (typeof f === "string" ? f : f?.tag)).filter(Boolean),
-    exercises: (d.exercises ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        sets: Number(e.sets),
-        reps: Number(e.reps),
-        weight: Number(e.weightKg),
-        note: e.note ?? "",
-    })),
-});
-
-async function refreshOneDay(dayId: string, setDays: Dispatch<SetStateAction<DaysDB>>) {
-    const d = await (await import("../lib/gymApi")).GymApi.getDay(dayId); // gọi /gym/days/:id
-    const ymd = toYMD(d.dateYmd);
-    const mapped = mapApiDayToFE(d);
-    setDays((prev) => ({ ...prev, [ymd]: { ...(prev[ymd] ?? {}), ...mapped } }));
-}
-
 
 /** =============== Local-storage hook (unit only) =============== */
 function useLocalStorage<T>(key: string, init: T) {
@@ -82,10 +57,6 @@ function useLocalStorage<T>(key: string, init: T) {
     }, [key, state]);
     return [state, setState] as const;
 }
-
-/** =============== Constants =============== */
-const KEY_UNIT = "gym-unit.v1";
-const MUSCLE_PRESETS = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Push", "Pull", "Full Body"];
 
 /** =================== Page =================== */
 export default function GymLogPage() {
@@ -117,24 +88,16 @@ export default function GymLogPage() {
     const [weekAnchor, setWeekAnchor] = useState<Date>(() => startOfWeek(new Date()));
     const [showQuickAdd, setShowQuickAdd] = useState(false);
 
-    const selKey = ymdLocal(selectedDate);
+    const selKey = fmtISO(selectedDate);
     const today = new Date();
 
-    // === Load month range 03/09
+    // === Load month range ===
     useEffect(() => {
         if (!userId) return;
         const first = startOfMonth(viewMonth);
-        const endExclusive = addMonths(first, 1);
-        loadRange(ymdLocal(first), ymdLocal(endExclusive)); // gọi GET /gym/days
+        const last = endOfMonth(viewMonth);
+        loadRange(fmtISO(first), fmtISO(last));
     }, [userId, viewMonth, loadRange]);
-
-    // useEffect(() => {
-    //     if (!userId) return;
-    //     const first = startOfMonth(viewMonth);
-    //     const endExclusive = addMonths(first, 1);
-    //     // truyền local YMD để server parse date-only (tùy API)
-    //     loadRange(ymdLocal(first), ymdLocal(endExclusive));
-    // }, [userId, viewMonth, loadRange]);
 
     // === Load presets once ===
     useEffect(() => {
@@ -142,7 +105,7 @@ export default function GymLogPage() {
         loadPresets();
     }, [userId, loadPresets]);
 
-    // Current day (from cache) hoặc default rỗng
+    // Current day
     const dayLog: DayLogFE = useMemo(
         () =>
             days[selKey] ?? {
@@ -156,13 +119,14 @@ export default function GymLogPage() {
         [days, selKey]
     );
 
+    // Ensure a day exists & return its id
     async function ensureDayId(): Promise<string> {
         if (dayLog.id) return dayLog.id;
         const created = await getOrCreateDay(selKey);
         return created.id;
     }
 
-    // Suggest last weight theo tên bài tập
+    // Suggest last weight
     const getLastWeightKg = (name: string) => {
         const keys = Object.keys(days).sort((a, b) => (a < b ? 1 : -1));
         for (const k of keys) {
@@ -220,7 +184,6 @@ export default function GymLogPage() {
                 note: form.note?.trim() || "",
             },
         ]);
-        await refreshOneDay(dayId, setDays);
         nameRef.current?.focus();
     };
 
@@ -233,46 +196,50 @@ export default function GymLogPage() {
         if (patch.note !== undefined) payload.note = patch.note;
         await updateExercise(exerciseId, payload);
         const dayId = await ensureDayId();
-        await refreshOneDay(dayId, setDays);
+        const d = await (await import("../lib/gymApi")).GymApi.getDay(dayId);
+        setDays((p) => ({
+            ...p,
+            [d.dateYmd]: {
+                ...p[d.dateYmd],
+                ...p[d.dateYmd],
+                id: d.id,
+                date: d.dateYmd,
+                done: d.done,
+                note: d.note,
+                focus: d.focus.map((f) => f.tag),
+                exercises: d.exercises.map((e) => ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weightKg, note: e.note })),
+            },
+        }));
     };
 
     const removeExerciseFE = async (exerciseId: string) => {
         await deleteExercise(exerciseId);
         const dayId = await ensureDayId();
-        await refreshOneDay(dayId, setDays);
+        const d = await (await import("../lib/gymApi")).GymApi.getDay(dayId);
+        setDays((p) => ({
+            ...p,
+            [d.dateYmd]: {
+                ...p[d.dateYmd],
+                id: d.id,
+                date: d.dateYmd,
+                done: d.done,
+                note: d.note,
+                focus: d.focus.map((f) => f.tag),
+                exercises: d.exercises.map((e) => ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weightKg, note: e.note })),
+            },
+        }));
     };
 
-    async function ensureDayIdSynced(): Promise<string> {
-        const id = dayLog.id ? dayLog.id : (await getOrCreateDay(selKey)).id;
-        await refreshOneDay(id, setDays);
-        return id;
-    }
-
-    const toggleFocusFE = async (tagLabel: string) => {
-        const dayId = await ensureDayIdSynced();
-
-        const api = await (await import("../lib/gymApi")).GymApi.getDay(dayId);
-        const current: string[] = (api.focus ?? []).map((f: any) => (typeof f === "string" ? norm(f) : norm(f?.tag)));
-
-        const want = norm(tagLabel);
-        const has = current.includes(want);
-
-        const ymd = selKey;
-        setDays((prev) => {
-            const base = prev[ymd] ?? dayLog;
-            const nextFocus = has ? base.focus.filter((t) => norm(t) !== want) : [...base.focus, tagLabel];
-            return { ...prev, [ymd]: { ...base, focus: nextFocus } };
-        });
-
-        if (has) await removeFocus(dayId, want);
-        else await addFocus(dayId, [want]);
-
-        refreshOneDay(dayId, setDays);
+    const toggleFocusFE = async (tag: string) => {
+        const dayId = await ensureDayId();
+        const has = dayLog.focus.includes(tag);
+        if (has) await removeFocus(dayId, tag);
+        else await addFocus(dayId, [tag]);
     };
+
     const toggleDoneFE = async () => {
         const dayId = await ensureDayId();
         await updateDay(dayId, { done: !dayLog.done });
-        await refreshOneDay(dayId, setDays);
     };
 
     // month label + month map (Map<string, DayLogFE> để giữ Calendar)
@@ -280,8 +247,7 @@ export default function GymLogPage() {
 
     const monthMap = useMemo(() => {
         const map = new Map<string, DayLogFE>();
-        for (const [rawK, v] of Object.entries(days)) {
-            const k = rawK.length > 10 ? rawK.slice(0, 10) : rawK;
+        for (const [k, v] of Object.entries(days)) {
             const d = parseISO(k);
             if (d.getFullYear() === viewMonth.getFullYear() && d.getMonth() === viewMonth.getMonth()) {
                 map.set(k, v);
@@ -296,17 +262,6 @@ export default function GymLogPage() {
     if (!userId) {
         return <div className="p-6 text-center text-slate-600 dark:text-slate-300">You need to log in to use Gym Log.</div>;
     }
-
-    // 30/09
-    useEffect(() => {
-        (async () => {
-            if (!dayLog?.id) return;
-
-            if ((dayLog.exercises?.length ?? 0) === 0) {
-                await refreshOneDay(dayLog.id, setDays); // gọi GET /gym/days/:id
-            }
-        })();
-    }, [selKey, dayLog.id]);
 
     return (
         <div className="h-full w-full p-4 sm:p-6 text-slate-800 dark:text-slate-100">
@@ -426,9 +381,8 @@ export default function GymLogPage() {
 
                         {/* Focus chips */}
                         <div className="mt-3 flex flex-wrap gap-2">
-                            {/* {console.log(dayLog)} */}
                             {MUSCLE_PRESETS.map((m) => {
-                                const active = dayLog.focus.some((t) => norm(t) === norm(m));
+                                const active = dayLog.focus.includes(m);
                                 return (
                                     <button
                                         key={m}
@@ -650,7 +604,7 @@ function MonthCalendar({
             </div>
             <div className="grid grid-cols-7 gap-2">
                 {cells.map(({ date, inMonth }, idx) => {
-                    const k = ymdLocal(date);
+                    const k = fmtISO(date);
                     const log = monthMap.get(k);
                     const selected = isSameDay(date, selectedDate);
                     const isToday = isSameDay(date, today);
@@ -737,7 +691,7 @@ function WeekScroller({
 
             <div className="flex gap-2 overflow-x-auto no-scrollbar px-2">
                 {days.map((d) => {
-                    const k = ymdLocal(d);
+                    const k = fmtISO(d);
                     const log = monthMap[k];
                     const selected = isSameDay(d, selectedDate);
                     const isToday = isSameDay(d, today);

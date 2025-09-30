@@ -6,7 +6,7 @@ import "./styles/App.css";
 
 export default function App() {
     return (
-        <div className="syne-mono-regular">
+        <div className="iceland-regular">
             <BrowserRouter>
                 <AppBankio />
             </BrowserRouter>

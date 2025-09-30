@@ -5,7 +5,7 @@ import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
 import { DesignTokens } from "./styles/DesignTokens";
 
-import { GymLogPage } from "./pages/GymLogPage";
+import GymLogPage from "./pages/GymLogPage";
 import InvestmentsPage from "./pages/InvestmentPage";
 import LoginPage from "./pages/LoginPage";
 import PlaylistPage from "./pages/PlaylistPage";
