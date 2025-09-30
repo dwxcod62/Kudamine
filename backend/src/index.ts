@@ -1,5 +1,5 @@
 // server.ts / index.ts
-import cors from "cors";
+import cors, { CorsOptionsDelegate } from "cors";
 import "dotenv/config";
 import express, { NextFunction, Request, Response } from "express";
 import path from "path";
@@ -12,39 +12,54 @@ import users from "./routes/users";
 const app = express();
 
 /**
- * Allowed origins:
- * - đọc từ env CORS_ORIGINS="http://localhost:5173,https://kudamine.vercel.app"
- * - thêm rule cho tất cả preview Vercel: *.vercel.app
+ * =========================
+ * CORS allow-list settings
+ * =========================
+ * - ENV CORS_ORIGINS="http://localhost:5173,https://kudamine.vercel.app"
+ * - Tự động allow *.vercel.app (preview Vercel)
  */
-const raw = process.env.CORS_ORIGINS ?? "http://localhost:5173,https://kudamine.vercel.app,https://kudamii.info,https://www.kudamii.info";
+const raw =
+    process.env.CORS_ORIGINS ??
+    "http://localhost:5173,https://kudamine.vercel.app,https://kudamii.info,https://www.kudamii.info,http://localhost:3000";
 const allowedOrigins = raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-const vercelPreviewRegex = /\.vercel\.app$/; // match mọi subdomain vercel
+const vercelPreviewRegex = /\.vercel\.app$/;
 
-const corsOptions: cors.CorsOptions = {
-    origin(origin, cb) {
-        // Các request không có Origin (curl, healthchecks)
-        if (!origin) return cb(null, true);
+const corsOptionsDelegate: CorsOptionsDelegate = (req, cb) => {
+    const origin = (req.headers.origin as string) || "";
+    // Request không có Origin (curl/health) -> không set CORS
+    if (!origin) return cb(null, { origin: false });
 
-        if (allowedOrigins.includes(origin)) return cb(null, true);
-        try {
-            const { hostname } = new URL(origin);
-            if (vercelPreviewRegex.test(hostname)) return cb(null, true);
-        } catch {
-            // bỏ qua nếu URL parse lỗi
-        }
-        return cb(new Error(`Not allowed by CORS: ${origin}`));
-    },
-    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false, // bật true nếu dùng cookie/session cross-site
+    let allow = false;
+    try {
+        const { hostname } = new URL(origin);
+        allow = allowedOrigins.includes(origin) || vercelPreviewRegex.test(hostname);
+    } catch {
+        allow = false;
+    }
+    if (!allow) return cb(null, { origin: false });
+
+    cb(null, {
+        // Khi dùng credentials phía FE, luôn echo đúng origin
+        origin,
+        credentials: true,
+        methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+        exposedHeaders: ["Set-Cookie"],
+        maxAge: 86400,
+    });
 };
 
-app.use(cors(corsOptions));
-// preflight (dùng cùng options để header khớp)
-app.options(/.*/, cors(corsOptions));
+// ===== Middleware CORS đứng trước mọi route =====
+app.use(cors(corsOptionsDelegate));
+
+// ===== Preflight: tránh path-to-regexp lỗi trên Express v5 =====
+app.use((req, res, next) => {
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+});
 
 // Body parsers
 app.use(express.json({ limit: "5mb" }));
@@ -52,6 +67,9 @@ app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 // Static
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Health check
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Swagger
 setupSwagger(app);
@@ -62,15 +80,17 @@ app.use("/gym", gym);
 app.use("/playlists", playlists);
 app.use("/spending", spending);
 
-// Error handler
+// Error handler (cuối cùng)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err);
-    res.status(err?.status || 500).json({ error: err?.message || "Server error" });
+    const code = err?.status || 500;
+    res.status(code).json({ error: err?.message || "Server error" });
 });
 
 // Start
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`API running at http://localhost:${PORT}`);
-    console.log(`Swagger docs at http://localhost:${PORT}/docs`);
+const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST ?? "0.0.0.0"; // để WSL/Docker truy cập được
+app.listen(PORT, HOST, () => {
+    console.log(`API running at http://${HOST}:${PORT}`);
+    console.log(`Swagger docs at http://${HOST}:${PORT}/docs`);
 });

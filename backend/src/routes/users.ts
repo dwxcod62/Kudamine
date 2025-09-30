@@ -1,8 +1,26 @@
+// routes/users.ts
 import { $Enums, PrismaClient } from "@prisma/client";
 import { Router } from "express";
+import jwt, { SignOptions } from "jsonwebtoken";
+
+import { signUsernameToken, verifyAndExtractUsername } from "../helpers/helpers";
 
 const prisma = new PrismaClient();
 const r = Router();
+
+/** --------------------------
+ *  Env helpers / JWT config
+ *  -------------------------- */
+function requireEnv(name: string) {
+    const v = process.env[name];
+    if (!v) throw new Error(`Missing env: ${name}`);
+    return v;
+}
+const JWT_ACCESS_SECRET = requireEnv("JWT_ACCESS_SECRET");
+
+// Accept either a number of seconds (e.g., "3600") or a StringValue like "7d"
+const RAW_EXPIRES = process.env.JWT_EXPIRES_IN ?? "7d";
+const JWT_EXPIRES_IN: SignOptions["expiresIn"] = /^\d+$/.test(RAW_EXPIRES) ? Number(RAW_EXPIRES) : (RAW_EXPIRES as SignOptions["expiresIn"]);
 
 /**
  * @openapi
@@ -93,11 +111,11 @@ r.get("/", async (req, res) => {
  *                   format: date-time
  */
 r.post("/", async (req, res) => {
-    const { email, name } = req.body ?? {};
+    const { email, name } = (req.body ?? {}) as { email?: string; name?: string };
     const user = await prisma.user.create({
         data: {
-            email,
-            name,
+            email: email ?? "",
+            name: name ?? "",
         },
     });
     res.status(201).json(user);
@@ -151,7 +169,7 @@ r.get("/:id", async (req, res) => {
  *       404: { description: Not found }
  */
 r.patch("/:id", async (req, res) => {
-    const { email, name } = req.body;
+    const { email, name } = (req.body ?? {}) as { email?: string; name?: string };
     try {
         const updated = await prisma.user.update({
             where: { id: req.params.id },
@@ -235,13 +253,83 @@ r.get("/:id/settings", async (req, res) => {
  *       200: { description: OK }
  */
 r.put("/:id/settings", async (req, res) => {
-    const { unit } = req.body as { unit?: $Enums.Unit };
+    const { unit } = (req.body ?? {}) as { unit?: $Enums.Unit };
     const up = await prisma.userSettings.upsert({
         where: { userId: req.params.id },
         update: { unit: unit ?? undefined, updatedAt: new Date() },
         create: { userId: req.params.id, unit: unit ?? "kg" },
     });
     res.json(up);
+});
+
+/**
+ * @openapi
+ * /users/code:
+ *   post:
+ *     summary: Generate login code from username
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ */
+r.post("/code", async (req, res) => {
+    const { username } = (req.body ?? {}) as { username?: string };
+    if (!username || typeof username !== "string") {
+        return res.status(400).json({ message: "username is required" });
+    }
+    try {
+        const code = signUsernameToken(username);
+        return res.json({ code });
+    } catch (e: any) {
+        return res.status(500).json({ message: e?.message ?? "Internal error" });
+    }
+});
+
+/**
+ * @openapi
+ * /users/login-code:
+ *   post:
+ *     summary: Login with code (no username or password)
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       401: { description: Invalid code }
+ */
+r.post("/login-code", async (req, res) => {
+    const { code } = (req.body ?? {}) as { code?: string };
+    if (!code || typeof code !== "string") {
+        return res.status(400).json({ message: "code is required" });
+    }
+    try {
+        const username = verifyAndExtractUsername(code);
+
+        const user = await prisma.user.findFirst({
+            where: { name: { equals: username, mode: "insensitive" } },
+            select: { id: true, name: true, email: true },
+        });
+        if (!user) return res.status(401).json({ message: "Invalid code" });
+
+        const token = jwt.sign({ sub: user.id, name: user.name ?? "user" }, JWT_ACCESS_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+        return res.json({ user, token });
+    } catch {
+        return res.status(401).json({ message: "Invalid code" });
+    }
 });
 
 export default r;

@@ -1,207 +1,269 @@
-import { useMemo, useState } from "react";
-
+// WindowsXPLogin.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import Bground from "../assets/2825727.gif";
+import RollingOneChar from "../components/RollingOneChar";
+import { randomString } from "../helpers/randomString";
+import { useBlinkCursor } from "../helpers/useBlinkCursor";
+import { postJSON } from "../lib/login";
+import { useAuthStore } from "../stores/auth";
 /**
- * ASCII Login — poster‑style
- * - Left rail: vertical slogan
- * - Center card: ASCII "blob" header + login form
- * - Halftone/bitmap feel using unicode blocks ░▒▓ and █
- * - No external libs required. Drop in any React+Tailwind app.
+ * Windows XP Login Screen (React + TailwindCSS)
+ * Optimized for desktop + mobile
  */
-export default function LoginPage() {
-    return (
-        <div className="min-h-screen w-full bg-[#eaf0ff] text-[#181a22] font-sans relative overflow-hidden">
-            {/* floating pixels */}
-            <FloatingPixels />
 
-            <div className="mx-auto max-w-6xl grid md:grid-cols-[120px_1fr] gap-6 px-6 py-10 items-center">
-                <LeftRail />
-                <LoginCard />
-            </div>
+type LoginCodeResponse = {
+    user: {
+        id: string;
+        name: string;
+        email?: string | null;
+        avatarUrl?: string | null;
+    };
+    token?: string; // nếu backend có phát hành JWT/session token thì trả kèm
+};
 
-            <footer className="text-center text-xs text-[#6b6f7a] py-6 select-none">morda‑inspired ASCII layout (custom, no logos)</footer>
-        </div>
-    );
-}
-
-function LeftRail() {
-    return (
-        <div className="hidden md:flex items-center justify-center select-none">
-            <div className="text-[#2b39ff] font-[600] tracking-[-.02em]" style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
-                <span className="text-[40px] leading-none">Like Running?</span>
-                <span className="h-6 inline-block" />
-                <span className="text-[40px] leading-none">Invest Now.</span>
-            </div>
-        </div>
-    );
-}
-
-function LoginCard() {
-    return (
-        <div className="relative rounded-3xl bg-white shadow-[0_20px_60px_rgba(23,31,56,.15)] border border-[#cfd6ff] overflow-hidden">
-            {/* ASCII header */}
-            <AsciiHeader />
-
-            {/* form */}
-            <div className="grid md:grid-cols-2 gap-6 p-6 md:p-8">
-                <FormFields />
-                <BlendedPanel />
-            </div>
-        </div>
-    );
-}
-
-function AsciiHeader() {
-    const ascii = useMemo(() => buildAsciiBlob(), []);
-    return (
-        <div className="relative">
-            <div className="absolute inset-0 bg-[#2b39ff] opacity-10" />
-            <pre className="relative z-10 w-full overflow-hidden p-6 md:p-8 bg-[#dfe6ff] text-[#2b39ff] rounded-t-3xl font-mono text-[10px] leading-[10px] md:text-[11px] md:leading-[11px] select-none">
-                {ascii}
-            </pre>
-            {/* dividing seam */}
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-[#a9b3ff] to-transparent" />
-        </div>
-    );
-}
-
-function FormFields() {
-    const [email, setEmail] = useState("");
-    const [pw, setPw] = useState("");
-
-    return (
-        <div>
-            <h2 className="text-2xl font-semibold mb-2 tracking-tight">Sign in</h2>
-            <p className="text-sm text-[#6b6f7a] mb-6">Welcome back — keep your portfolio in motion.</p>
-
-            <label className="block text-xs uppercase tracking-widest text-[#6b6f7a]">Email</label>
-            <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="mt-1 w-full rounded-xl border border-[#cfd6ff] bg-white px-4 py-3 font-mono text-sm focus:outline-none focus:ring-4 focus:ring-[#2b39ff]/20"
-            />
-
-            <div className="h-4" />
-            <label className="block text-xs uppercase tracking-widest text-[#6b6f7a]">Password</label>
-            <AsciiPassword value={pw} onChange={setPw} />
-
-            <div className="mt-6 flex items-center justify-between">
-                <button className="rounded-full bg-[#2b39ff] text-white px-5 py-2.5 text-sm font-semibold shadow-[0_8px_20px_rgba(43,57,255,.35)] hover:translate-y-[-1px] transition-transform">
-                    Continue
-                </button>
-                <a className="text-sm text-[#2b39ff] hover:underline" href="#">
-                    Forgot?
-                </a>
-            </div>
-        </div>
-    );
-}
-
-/** Password field with ASCII mask that animates characters into ▓ */
-function AsciiPassword({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export default function WindowsXPLogin() {
+    const [code, setCode] = useState("");
+    const [capsOn, setCapsOn] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [focused, setFocused] = useState(false);
-    const masked = useMemo(() => value.replace(/./g, "▓"), [value]);
+    const [loading, setLoading] = useState(false);
 
-    return (
-        <div className="relative group">
-            {/* Visible ASCII mask layer */}
-            <div
-                className={`font-mono text-sm px-4 py-3 border rounded-xl ${
-                    focused ? "border-[#2b39ff] ring-4 ring-[#2b39ff]/15" : "border-[#cfd6ff]"
-                } text-[#181a22] bg-white tracking-[.15em] select-none`}
-            >
-                {masked || "░░░░░░░░"}
-            </div>
-            {/* Real input overlay for accessibility */}
-            <input
-                type="password"
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-text"
-                aria-label="Password"
-            />
-        </div>
-    );
-}
+    const navigate = useNavigate();
+    const location = useLocation();
+    const from = (location.state as any)?.from?.pathname || "/spending";
 
-function BlendedPanel() {
-    return (
-        <div className="relative rounded-2xl border border-[#cfd6ff] bg-white p-4 md:p-5 overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-28 bg-[#2b39ff]/10" />
-            <div className="relative grid grid-cols-2 gap-3">
-                <MiniAscii title="Halftone" density="▒▓" />
-                <MiniAscii title="Dots" density="·•" />
-                <MiniAscii title="Waves" density="≈≋" />
-                <MiniAscii title="Pixels" density="▞▚" />
-            </div>
-        </div>
-    );
-}
+    const setAuth = useAuthStore((s) => s.setAuth);
 
-function MiniAscii({ title, density }: { title: string; density: string }) {
-    const art = useMemo(() => makeHalftone(18, 8, density), [density]);
-    return (
-        <div className="rounded-xl bg-[#f5f7ff] border border-[#d7ddff] p-3">
-            <div className="text-[10px] uppercase tracking-widest text-[#6b6f7a] mb-1">{title}</div>
-            <pre className="font-mono text-[9px] leading-[9px] text-[#2b39ff] select-none">{art}</pre>
-        </div>
-    );
-}
+    const [randomText, setRandomText] = useState(randomString(8));
 
-function FloatingPixels() {
-    const dots = useMemo(() => {
-        const items: { left: string; top: string }[] = [];
-        for (let i = 0; i < 50; i++) {
-            items.push({ left: `${Math.random() * 100}%`, top: `${Math.random() * 80}%` });
-        }
-        return items;
+    useEffect(() => {
+        const t = setInterval(() => {
+            const len = 6 + Math.floor(Math.random() * 5);
+            setRandomText(randomString(len));
+        }, 750);
+        return () => clearInterval(t);
     }, []);
 
+    async function onSubmit(e?: React.FormEvent) {
+        if (e) e.preventDefault();
+        setError(null);
+        if (!code.trim()) {
+            setError("Please enter your login code.");
+            return;
+        }
+        setLoading(true);
+        try {
+            const data = await postJSON<LoginCodeResponse>("/users/login-code", { code: code.trim() });
+            // lưu vào store (không lưu code):
+            setAuth(
+                {
+                    id: data.user.id,
+                    name: data.user.name,
+                    email: data.user.email ?? null,
+                    avatarUrl: data.user.avatarUrl ?? null,
+                },
+                data.token
+            );
+            toast.success(`Welcome, ${data.user.name}!`);
+            navigate(from, { replace: true });
+        } catch (err: any) {
+            toast.error(err?.message || "Invalid code. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
+        setCapsOn((e.getModifierState && e.getModifierState("CapsLock")) || false);
+        if (e.key === "Enter") onSubmit();
+    }
+
+    const c = useMemo(
+        () => ({
+            blue: "#3a6ea5",
+            blueDark: "#2a4e7c",
+            border: "#1e3c72",
+            winSilver: "#d4d0c8",
+            link: "#0046d5",
+        }),
+        []
+    );
+    const cursor = useBlinkCursor(500);
+
     return (
-        <div className="absolute inset-0 pointer-events-none select-none">
-            {dots.map((d, i) => (
-                <span key={i} className="absolute text-[#2b39ff] text-[8px] opacity-60" style={{ left: d.left, top: d.top }}>
-                    ▪
-                </span>
-            ))}
+        <div className="relative min-h-[100svh] w-screen overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] syne-mono-regular">
+            <img src={Bground} alt="background" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side,transparent,rgba(0,0,0,.25))]" />
+
+            <div className="absolute left-1/2 top-1/2 w-[90vw] max-w-[720px] px-4 -translate-x-1/2 -translate-y-1/2">
+                <div
+                    className="rounded-t-xl px-4 py-2 text-white shadow"
+                    style={{
+                        background: "linear-gradient(180deg, #3a6ea5 0%, #2a4e7c 100%)",
+                        boxShadow: "0 2px 0 rgba(0,0,0,.15) inset",
+                    }}
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="font-bold tracking-wide">Log On to Kudamine</div>
+                        <div className="text-xs opacity-90">
+                            <div className="text-xs opacity-90 flex items-center gap-1">
+                                <span>{cursor}:</span>
+                                <span>Kudamine</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    className="rounded-b-xl border-x border-b p-6"
+                    style={{
+                        borderColor: c.border,
+                        background: "linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(240,248,255,.9) 100%)",
+                    }}
+                >
+                    <div className="mb-5 text-sm text-black/80">
+                        <RollingOneChar text="Enter your login code 🔑" tickMs={35} scrambleMs={750} pauseMs={60} />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] items-center gap-5">
+                        <div className="flex flex-col items-center">
+                            <div
+                                className="grid place-items-center h-[88px] w-[88px] rounded-xl border shadow"
+                                style={{
+                                    background: "linear-gradient(180deg, #f8fcff 0%, #dfefff 100%)",
+                                    borderColor: c.winSilver,
+                                    boxShadow: "inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.2)",
+                                }}
+                            >
+                                <img
+                                    alt="user"
+                                    width={88}
+                                    height={88}
+                                    className="h-full w-full object-cover"
+                                    src={`https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(randomText)}`}
+                                />
+                            </div>
+                            <div className="mt-2 text-black/90" />
+                        </div>
+
+                        <form onSubmit={onSubmit} className="space-y-3">
+                            <div className="text-xs text-black/70 flex items-center gap-1">
+                                <span>Code for:</span>
+                                <span className="font-mono text-black">{randomText}</span>
+                            </div>
+
+                            <div className="relative max-w-md">
+                                <input
+                                    type="text"
+                                    inputMode="text"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value)}
+                                    onKeyUp={onKey}
+                                    onFocus={() => setFocused(true)}
+                                    onBlur={() => setFocused(false)}
+                                    className="w-full rounded border px-3 py-3 text-[16px] outline-none transition"
+                                    style={{
+                                        borderColor: focused ? c.blue : c.winSilver,
+                                        boxShadow: focused ? "0 0 0 2px rgba(58,110,165,.35)" : "inset 0 1px 0 #fff, 0 1px 0 rgba(0,0,0,.05)",
+                                        background: "linear-gradient(180deg, #ffffff 0%, #f3f6fb 100%)",
+                                    }}
+                                    placeholder="e.g. KDMN-9F2X-7Q..."
+                                />
+                                {capsOn && <div className="absolute -bottom-6 left-0 text-xs text-red-700">Caps Lock is on.</div>}
+                            </div>
+
+                            {error && (
+                                <div
+                                    className="rounded border px-3 py-3 text-sm"
+                                    style={{ borderColor: "#ffb4b4", background: "#fff5f5", color: "#8c1d18" }}
+                                >
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="rounded px-4 py-2 text-sm font-semibold text-white shadow w-full sm:w-auto disabled:opacity-70"
+                                    style={{
+                                        background: "linear-gradient(180deg, #4aa52e 0%, #2a7a16 100%)",
+                                        boxShadow: "inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.25)",
+                                    }}
+                                >
+                                    {loading ? "Logging in..." : "Log On"}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCode("");
+                                        setError(null);
+                                    }}
+                                    className="rounded px-4 py-2 text-sm font-semibold text-black/80 w-full sm:w-auto"
+                                    style={{
+                                        background: "linear-gradient(180deg, #ffffff 0%, #e9edf2 100%)",
+                                        boxShadow: "inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15)",
+                                        border: `1px solid ${c.winSilver}`,
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-black/70">
+                        <div className="flex items-center gap-2">
+                            <ShutdownButton />
+                            <span className="hidden sm:inline">Click Shut Down to turn off the computer.</span>
+                        </div>
+                        <LangClock />
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
 
-/** --- helpers --- */
-function makeHalftone(w: number, h: number, density = "░▒▓█") {
-    const levels = density.split("");
-    const rows: string[] = [];
-    for (let y = 0; y < h; y++) {
-        let line = "";
-        for (let x = 0; x < w; x++) {
-            const v = Math.sin(x * 0.7) + Math.cos(y * 0.6) + Math.sin((x + y) * 0.25);
-            const idx = clamp(Math.floor(((v + 2) / 4) * levels.length), 0, levels.length - 1);
-            line += levels[idx];
-        }
-        rows.push(line);
-    }
-    return rows.join("\n");
+function ShutdownButton() {
+    return (
+        <button
+            className="flex items-center gap-2 rounded-full px-4 py-1.5 text-white shadow"
+            style={{
+                background: "linear-gradient(180deg, #d34a3d 0%, #a31f16 100%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,.55), 0 1px 2px rgba(0,0,0,.25)",
+            }}
+            onClick={() => {
+                window.close();
+                window.location.href = "https://www.youtube.com/watch?v=QDia3e12czc";
+            }}
+        >
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-white" />
+            <span className="text-sm font-semibold">Turn off computer</span>
+        </button>
+    );
 }
 
-function buildAsciiBlob() {
-    // A stylized top/bottom split blob — avoids any trademarked shape
-    const top = `
-█████████████████████████████████████████████████████
-█████████████████████████████████████████████████████
-█████████████████████████████████████████████████████
-█████████████████████████████████████████████████████
-█████████████████████████████████████████████████████
-███████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒████████████████████
-███████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██████████████████
-█████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒████████████████
-███████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒██████████████
-██████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒█████████████
-`;
-    const bottom = makeHalftone(52, 16, "░▒");
-    return top + bottom;
+function LangClock() {
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const t = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(t);
+    }, []);
+    const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return (
+        <div className="flex items-center gap-3">
+            <div className="rounded border bg-white/60 px-2 py-0.5 text-[11px] shadow" style={{ borderColor: "#d4d0c8" }}>
+                EN
+            </div>
+            <div className="rounded border bg-white/60 px-2 py-0.5 text-[11px] shadow" style={{ borderColor: "#d4d0c8" }}>
+                {time}
+            </div>
+        </div>
+    );
 }
-
-const clamp = (n: number, mn: number, mx: number) => Math.max(mn, Math.min(mx, n));

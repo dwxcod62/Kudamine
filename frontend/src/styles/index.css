@@ -6,6 +6,18 @@
     --bg-page: #f8fafc;
 }
 
+.rubik-glitch-regular {
+    font-family: "Rubik Glitch", system-ui;
+    font-weight: 600;
+    font-style: normal;
+}
+
+.syne-mono-regular {
+    font-family: "Syne Mono", monospace;
+    font-weight: 400;
+    font-style: normal;
+}
+
 .dark {
     --bg-page: #0f172a;
 }
@@ -21,4 +33,18 @@ body {
 }
 .dark body {
     @apply bg-gray-900 text-gray-100;
+}
+
+@keyframes blink {
+    0%,
+    50% {
+        opacity: 1;
+    }
+    50.01%,
+    100% {
+        opacity: 0;
+    }
+}
+.blink {
+    animation: blink 1s step-start infinite;
 }
