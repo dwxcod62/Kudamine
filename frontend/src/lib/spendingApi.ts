@@ -40,3 +40,12 @@ export async function deleteEntry(id: string) {
     if (!res.ok) throw new Error(await res.text());
     return await res.json();
 }
+
+export type MonthRow = { monthKey: string; _count: { _all: number } };
+
+export async function listMonths(userId: string): Promise<MonthRow[]> {
+    const qs = new URLSearchParams({ userId });
+    const res = await fetch(`${import.meta.env.VITE_API_BASE}/spending/months?` + qs.toString());
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}

@@ -1,241 +1,538 @@
-type Props = {
-    /** Chiều rộng khung cảnh, ví dụ "950px" hoặc "92vw" */
-    width?: string;
-    /** Màu phát sáng chính của màn hình */
-    glow?: string; // ví dụ "#00ff7b"
-};
+// src/pages/GymLogPage.tsx
+import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Dumbbell, Plus, Settings as SettingsIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { DayLogFE } from "../hooks/useGymData";
+import { useGymData } from "../hooks/useGymData";
+import { useAuthStore } from "../stores/auth";
 
-export default function RetroCRT({ width = "92vw", glow = "#00ff7b" }: Props) {
-    const css = `
-  :root{
-    --bg:#0b1412;
-    --crt:${glow};
-    --crt-dim:#0bbf6a;
-    --bezel:#1d332c;
-    --bezel-2:#0f221b;
-    --bezel-3:#0a1814;
-    --btn:#163126;
-    --btn-on:${glow};
-    --glass:#163d2e;
-  }
-  .crt-wrap{
-    display:grid;
-    place-items:center;
-    width: ${width};
-    max-width: 950px;
-    aspect-ratio: 16 / 9;
-    filter: drop-shadow(0 40px 60px rgba(0,0,0,.6));
-    position:relative;
-    margin-inline:auto;
-  }
-  .crt-bg{
-    position:absolute; inset:-20% -20%;
-    background:
-      radial-gradient(1200px 700px at 50% 80%, #0f1f1b 0%, #0b1412 40%, #07100c 65%, #050c09 100%),
-      var(--bg);
-    z-index:-2;
-    border-radius:24px;
-  }
-  .crt-dust{
-    content:"";
-    position:absolute; inset:-20% -20%;
-    background:
-      radial-gradient(2px 2px at 20% 30%, #2cff9a88 40%, transparent 45%),
-      radial-gradient(2px 2px at 60% 70%, #2cff9a66 40%, transparent 45%),
-      radial-gradient(1.5px 1.5px at 80% 20%, #2cff9a55 40%, transparent 45%),
-      radial-gradient(1.5px 1.5px at 35% 80%, #2cff9a55 40%, transparent 45%),
-      radial-gradient(1px 1px at 10% 60%, #2cff9a44 40%, transparent 45%),
-      radial-gradient(1px 1px at 90% 40%, #2cff9a33 40%, transparent 45%);
-    animation: crt-drift 22s linear infinite;
-    pointer-events:none;
-    opacity:.4;
-    z-index:-1;
-  }
-  @keyframes crt-drift {
-    0%   { transform: translate3d(0,0,0); }
-    100% { transform: translate3d(60px, -40px, 0); }
-  }
+// Components
+import { DesktopExerciseRow, type Exercise } from "../components/gym/DesktopExerciseRow";
+import { InlineAddPreset } from "../components/gym/InlineAddPreset";
+import { MobileExerciseCard } from "../components/gym/MobileExerciseCard";
+import { MonthCalendar } from "../components/gym/MonthCalendar";
+import { Stepper } from "../components/gym/Stepper";
+import { WeekScroller } from "../components/gym/WeekScroller";
 
-  .crt-monitor{
-    position:absolute; inset:7% 12% 22%;
-    background: linear-gradient(180deg, #102620, #0a1b16 60%, #071410);
-    border-radius:18px;
-    box-shadow: inset 0 0 0 2px #0e221c, inset 0 0 0 6px #0a1b16, 0 20px 40px rgba(0,0,0,.65);
-    display:grid;
-    grid-template-rows: 1fr auto;
-    padding:18px;
-  }
-  .crt-frame{
-    border-radius:12px;
-    background: linear-gradient(180deg, #163226, #0f241c 60%, #0d221a);
-    box-shadow: inset 0 0 0 3px #0a1b16, inset 0 0 30px #07140f;
-    padding:12px;
-    position:relative;
-  }
-  .crt-glass{
-    position:relative;
-    height:100%;
-    border-radius:10px;
-    background: radial-gradient(120% 100% at 50% 50%, #0c311f 0 40%, #072217 70%, #051a12 100%);
-    overflow:hidden;
-    box-shadow: inset 0 0 50px #02110b, inset 0 0 120px #03160f;
-  }
-  .crt-screen{
-    position:absolute; inset:6% 6%;
-    border-radius:6px;
-    background:
-      radial-gradient(110% 90% at 50% 30%, var(--crt) 0 15%, #59ffa9 20%, var(--crt-dim) 35%, #0cdf6b 60%, #0db45b 72%, #0b8b4b 85%, #0a6b3e 100%);
-    filter: blur(.3px) saturate(115%);
-    box-shadow: 0 0 60px 20px color-mix(in oklab, var(--crt) 20%, transparent),
-                inset 0 0 18px #ffffff66,
-                inset 0 0 120px color-mix(in oklab, var(--crt) 18%, transparent);
-  }
-  .crt-scan{
-    position:absolute; inset:6% 6%;
-    border-radius:6px;
-    background:
-      repeating-linear-gradient( to bottom, rgba(0,0,0,.12) 0 2px, rgba(0,0,0,0) 2px 3px ),
-      linear-gradient(180deg, transparent 0 75%, rgba(0,0,0,.25));
-    mix-blend-mode:multiply;
-    pointer-events:none;
-  }
-  .crt-glow{
-    position:absolute; inset:0; border-radius:inherit;
-    box-shadow: 0 0 120px 30px color-mix(in oklab, var(--crt) 18%, transparent);
-    pointer-events:none;
-  }
-  .crt-screen, .crt-scan { animation: crt-flick 4.2s steps(60) infinite; }
-  @keyframes crt-flick {
-    0%,100% { opacity:1; }
-    47% { opacity:.98; }
-    50% { opacity:1; }
-    53% { opacity:.97; }
-  }
-  .crt-ui1, .crt-ui2, .crt-ui3{
-    position:absolute; left:10%; right:10%;
-    background: linear-gradient(180deg, #d6ffe9aa, #b9ffdbaa);
-    box-shadow: 0 8px 20px #0b6b3e55, inset 0 0 0 1px #ffffff55;
-    border-radius:4px; filter: blur(.15px);
-  }
-  .crt-ui1{ top:22%; height:10%; }
-  .crt-ui2{ top:38%; height:9%;  opacity:.85; }
-  .crt-ui3{ top:56%; height:7.5%; opacity:.75; }
+// Utils
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { addDays, addMonths, parseISO, startOfMonth, startOfWeek, ymdLocal } from "../utils/date";
+import { refreshOneDay } from "../utils/gymMap";
+import { norm } from "../utils/strings";
+import { kgToLb, lbToKg, type Unit } from "../utils/units";
 
-  .crt-controls{
-    margin-top:12px;
-    display:flex; gap:10px; align-items:center; justify-content:center;
-    padding:10px;
-    background: linear-gradient(180deg, #0d221a, #091812);
-    border-radius:8px;
-    box-shadow: inset 0 0 0 2px #0a1b16;
-  }
-  .crt-led{
-    width:16px; height:10px; border-radius:2px; background:var(--btn);
-    box-shadow: inset 0 -2px 0 #0b2018, inset 0 2px 0 #1b3b2f;
-  }
-  .crt-led.on{
-    background: var(--btn-on);
-    box-shadow: 0 0 12px 2px color-mix(in oklab, var(--crt) 70%, transparent), inset 0 0 0 1px #b9ffd9;
-  }
+/* =================== Types =================== */
+type DaysDB = Record<string, DayLogFE>;
 
-  .crt-base{
-    position:absolute; left:8%; right:8%; bottom:5%;
-    height:12%;
-    background: linear-gradient(#0d221a, #081710);
-    border-radius:10px;
-    box-shadow: inset 0 0 0 2px #0a1b16, 0 20px 40px rgba(0,0,0,.6);
-  }
-  .crt-keys{
-    position:absolute; inset:12% 10%;
-    display:grid; grid-template-columns: repeat(18, 1fr);
-    gap:6px 6px;
-  }
-  .crt-key{
-    height:18px; border-radius:3px;
-    background: linear-gradient(#143322, #0e251b);
-    box-shadow: inset 0 -2px 0 #07170f, inset 0 1px 0 #1e3d2f;
-  }
-  .crt-key:nth-child(odd){ filter:brightness(1.1) }
-  .crt-space{ grid-column: span 6; }
+/* =================== Constants =================== */
+const KEY_UNIT = "gym-unit.v1";
+const MUSCLE_PRESETS = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Push", "Pull", "Full Body"];
 
-  .crt-device{
-    position:absolute; right:3%; bottom:7%;
-    width:14%; height:15%;
-    background: linear-gradient(#132b21, #0d221a);
-    border-radius:8px;
-    box-shadow: inset 0 0 0 2px #0a1b16;
-  }
-  .crt-slot{
-    position:absolute; left:10%; right:10%; top:38%; height:16%;
-    background:#06140e;
-    box-shadow: inset 0 0 0 2px #0d221a;
-    border-radius:2px;
-  }
-  `;
+export default function GymLogPage() {
+    const user = useAuthStore((s) => s.user);
+    const userId = user?.id ?? "";
+
+    const {
+        days,
+        setDays,
+        presets,
+        loadPresets,
+        createPreset,
+        loading,
+        loadRange,
+        getOrCreateDay,
+        updateDay,
+        addFocus,
+        removeFocus,
+        addExercises,
+        updateExercise,
+        deleteExercise,
+    } = useGymData(userId);
+
+    const [unit, setUnit] = useLocalStorage<Unit>(KEY_UNIT, "kg");
+    const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
+    const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+    const [weekAnchor, setWeekAnchor] = useState<Date>(() => startOfWeek(new Date()));
+    const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+    const selKey = ymdLocal(selectedDate);
+    const today = new Date();
+
+    // Load current month range
+    useEffect(() => {
+        if (!userId) return;
+        const first = startOfMonth(viewMonth);
+        const endExclusive = addMonths(first, 1);
+        loadRange(ymdLocal(first), ymdLocal(endExclusive));
+    }, [userId, viewMonth, loadRange]);
+
+    // Load presets once
+    useEffect(() => {
+        if (!userId) return;
+        loadPresets();
+    }, [userId, loadPresets]);
+
+    const dayLog: DayLogFE = useMemo(
+        () =>
+            days[selKey] ?? {
+                id: "",
+                date: selKey,
+                done: false,
+                focus: [],
+                exercises: [],
+                note: "",
+            },
+        [days, selKey]
+    );
+
+    async function ensureDayId(): Promise<string> {
+        if (dayLog.id) return dayLog.id;
+        const created = await getOrCreateDay(selKey);
+        return created.id;
+    }
+
+    const getLastWeightKg = (name: string) => {
+        const keys = Object.keys(days).sort((a, b) => (a < b ? 1 : -1));
+        for (const k of keys) {
+            const ex = days[k]?.exercises?.find((e) => e.name.toLowerCase() === name.toLowerCase());
+            if (ex) return ex.weight;
+        }
+        return undefined;
+    };
+
+    useEffect(() => {
+        setWeekAnchor(startOfWeek(selectedDate));
+    }, [selectedDate]);
+
+    const shiftWeek = (deltaDays: number) => {
+        const start = startOfWeek(weekAnchor);
+        const newStart = addDays(start, deltaDays);
+        const offset = selectedDate.getDay();
+        const newSelected = addDays(newStart, offset);
+        setSelectedDate(newSelected);
+    };
+
+    // Add exercise form state
+    const [form, setForm] = useState<Partial<Exercise>>({
+        name: "",
+        sets: 3,
+        reps: 10,
+        weight: 20,
+        note: "",
+    });
+    const nameRef = useRef<HTMLInputElement>(null);
+
+    const applyPresetName = (name: string) => {
+        const lastKg = getLastWeightKg(name);
+        const baseKg = lastKg ?? 20;
+        const shown = unit === "kg" ? baseKg : kgToLb(baseKg);
+        setForm({
+            name,
+            sets: 3,
+            reps: 10,
+            weight: Number(shown.toFixed(1)),
+            note: "",
+        });
+        nameRef.current?.focus();
+    };
+
+    const addExerciseFE = async () => {
+        const nm = form.name?.trim();
+        if (!nm) {
+            nameRef.current?.focus();
+            return;
+        }
+        const baseKg = unit === "kg" ? Number(form.weight ?? 0) : lbToKg(Number(form.weight ?? 0));
+        const dayId = await ensureDayId();
+        await addExercises(dayId, [
+            {
+                name: nm,
+                sets: Number(form.sets ?? 3),
+                reps: Number(form.reps ?? 10),
+                weightKg: Number(isNaN(baseKg) ? 0 : Math.max(0, baseKg)),
+                note: form.note?.trim() || "",
+            },
+        ]);
+        await refreshOneDay(dayId, setDays);
+        nameRef.current?.focus();
+    };
+
+    const editExerciseFE = async (exerciseId: string, patch: Partial<Exercise>) => {
+        const payload: any = {};
+        if (patch.name !== undefined) payload.name = patch.name;
+        if (patch.sets !== undefined) payload.sets = patch.sets;
+        if (patch.reps !== undefined) payload.reps = patch.reps;
+        if (patch.weight !== undefined) payload.weightKg = patch.weight; // FE giữ kg
+        if (patch.note !== undefined) payload.note = patch.note;
+        await updateExercise(exerciseId, payload);
+        const dayId = await ensureDayId();
+        await refreshOneDay(dayId, setDays);
+    };
+
+    const removeExerciseFE = async (exerciseId: string) => {
+        await deleteExercise(exerciseId);
+        const dayId = await ensureDayId();
+        await refreshOneDay(dayId, setDays);
+    };
+
+    async function ensureDayIdSynced(): Promise<string> {
+        const id = dayLog.id ? dayLog.id : (await getOrCreateDay(selKey)).id;
+        await refreshOneDay(id, setDays);
+        return id;
+    }
+
+    const toggleFocusFE = async (tagLabel: string) => {
+        const dayId = await ensureDayIdSynced();
+
+        const api = await (await import("../lib/gymApi")).GymApi.getDay(dayId);
+        const current: string[] = (api.focus ?? []).map((f: any) => (typeof f === "string" ? norm(f) : norm(f?.tag)));
+
+        const want = norm(tagLabel);
+        const has = current.includes(want);
+
+        const ymd = selKey;
+        setDays((prev) => {
+            const base = prev[ymd] ?? dayLog;
+            const nextFocus = has ? base.focus.filter((t) => norm(t) !== want) : [...base.focus, tagLabel];
+            return { ...prev, [ymd]: { ...base, focus: nextFocus } };
+        });
+
+        if (has) await removeFocus(dayId, want);
+        else await addFocus(dayId, [want]);
+
+        refreshOneDay(dayId, setDays);
+    };
+
+    const toggleDoneFE = async () => {
+        const dayId = await ensureDayId();
+        await updateDay(dayId, { done: !dayLog.done });
+        await refreshOneDay(dayId, setDays);
+    };
+
+    const monthLabel = useMemo(() => viewMonth.toLocaleString("en-US", { month: "long", year: "numeric" }), [viewMonth]);
+
+    const monthMap = useMemo(() => {
+        const map = new Map<string, DayLogFE>();
+        for (const [rawK, v] of Object.entries(days)) {
+            const k = rawK.length > 10 ? rawK.slice(0, 10) : rawK;
+            const d = parseISO(k);
+            if (d.getFullYear() === viewMonth.getFullYear() && d.getMonth() === viewMonth.getMonth()) {
+                map.set(k, v);
+            }
+        }
+        return map;
+    }, [days, viewMonth]);
+
+    const showWeight = (kg: number) => (unit === "kg" ? kg : kgToLb(kg));
+    const fromInputWeightToKg = (val: number) => (unit === "kg" ? val : lbToKg(val));
+
+    if (!userId) {
+        return <div className="p-6 text-center text-slate-600 dark:text-slate-300">You need to log in to use Gym Log.</div>;
+    }
+
+    // Ensure day details hydrated when switching dates
+    useEffect(() => {
+        (async () => {
+            if (!dayLog?.id) return;
+            if ((dayLog.exercises?.length ?? 0) === 0) {
+                await refreshOneDay(dayLog.id, setDays);
+            }
+        })();
+    }, [selKey, dayLog.id]);
 
     return (
-        <div
-            style={{
-                width: "100%",
-                minHeight: "100vh",
-                display: "grid",
-                placeItems: "center",
-                background: "#0b1412",
-            }}
-        >
-            <style>{css}</style>
+        <div className="h-full w-full p-4 sm:p-6 text-slate-800 dark:text-slate-100">
+            {/* Header */}
+            <div className="max-w-6xl mx-auto mb-4 sm:mb-6 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-500 text-white shrink-0">
+                        <Dumbbell className="h-5 w-5" />
+                    </div>
+                    <div className="truncate">
+                        <h2 className="text-xl sm:text-2xl font-semibold truncate">Gym Log</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Theo dõi bài tập & mức tạ • mobile-first</p>
+                    </div>
+                </div>
 
-            <div className="crt-wrap">
-                <div className="crt-bg" />
-                <div className="crt-dust" />
+                <div className="flex items-center gap-2">
+                    {/* Unit */}
+                    <div className="hidden sm:flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm dark:border-slate-700">
+                        <SettingsIcon className="h-4 w-4 text-slate-500" />
+                        <span className="text-slate-500">Unit</span>
+                        <button
+                            onClick={() => setUnit("kg")}
+                            className={`px-2 py-0.5 rounded ${
+                                unit === "kg" ? "bg-emerald-500 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                            }`}
+                        >
+                            kg
+                        </button>
+                        <button
+                            onClick={() => setUnit("lb")}
+                            className={`px-2 py-0.5 rounded ${
+                                unit === "lb" ? "bg-emerald-500 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                            }`}
+                        >
+                            lb
+                        </button>
+                    </div>
 
-                <div className="crt-monitor">
-                    <div className="crt-frame">
-                        <div className="crt-glass">
-                            <div className="crt-screen"></div>
-                            <div className="crt-scan"></div>
-                            <div className="crt-glow"></div>
+                    {/* Month nav (desktop) */}
+                    <div className="hidden sm:flex items-center gap-2">
+                        <button
+                            onClick={() => setViewMonth((m) => addMonths(m, -1))}
+                            className="rounded-lg border px-2 py-2 text-sm dark:border-slate-700"
+                            title="Prev"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <div className="rounded-lg border px-3 py-2 text-sm dark:border-slate-700 flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-slate-500" />
+                            <span>{monthLabel}</span>
+                        </div>
+                        <button
+                            onClick={() => setViewMonth((m) => addMonths(m, 1))}
+                            className="rounded-lg border px-2 py-2 text-sm dark:border-slate-700"
+                            title="Next"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
 
-                            {/* các thanh UI giả trên màn hình */}
-                            <div className="crt-ui1"></div>
-                            <div className="crt-ui2"></div>
-                            <div className="crt-ui3"></div>
+            {/* Layout */}
+            <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[360px,minmax(0,1fr)] gap-4 sm:gap-6">
+                {/* Month calendar (>= lg) */}
+                <div className="hidden lg:block bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow">
+                    <MonthCalendar viewMonth={viewMonth} selectedDate={selectedDate} onSelect={setSelectedDate} monthMap={monthMap} today={today} />
+                </div>
+
+                {/* Week scroller (mobile) */}
+                <div className="lg:hidden">
+                    <WeekScroller
+                        anchorDate={weekAnchor}
+                        selectedDate={selectedDate}
+                        onSelect={(d) => setSelectedDate(d)}
+                        today={today}
+                        monthMap={days as DaysDB}
+                        onShift={shiftWeek}
+                    />
+                </div>
+
+                {/* Right: day details */}
+                <div className="flex flex-col gap-4 sm:gap-6">
+                    {/* Day + Done + Focus + Unit (mobile unit switch) */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">Selected</div>
+                                <div className="text-lg sm:text-xl font-bold">
+                                    {selectedDate.toLocaleDateString("en-US", {
+                                        weekday: "long",
+                                        month: "long",
+                                        day: "numeric",
+                                        year: "numeric",
+                                    })}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="sm:hidden rounded-lg border px-2.5 py-1.5 text-xs dark:border-slate-700">
+                                    <span className="text-slate-500 mr-1">Unit</span>
+                                    <button
+                                        onClick={() => setUnit(unit === "kg" ? "lb" : "kg")}
+                                        className="px-2 py-0.5 rounded bg-emerald-500 text-white"
+                                    >
+                                        {unit}
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={toggleDoneFE}
+                                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition ${
+                                        dayLog.done
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                                    }`}
+                                    disabled={loading}
+                                >
+                                    <Check className="h-4 w-4" />
+                                    {dayLog.done ? "Đã tập" : "Đánh dấu đã tập"}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Focus chips */}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {MUSCLE_PRESETS.map((m) => {
+                                const active = dayLog.focus.some((t) => norm(t) === norm(m));
+                                return (
+                                    <button
+                                        key={m}
+                                        onClick={() => toggleFocusFE(m)}
+                                        className={`chip transition ${active ? "bg-emerald-500 !text-white" : ""}`}
+                                        style={{ padding: ".35rem .65rem" }}
+                                        disabled={loading}
+                                    >
+                                        {m}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
-                    <div className="crt-controls">
-                        <div className="crt-led on"></div>
-                        <div className="crt-led on"></div>
-                        <div className="crt-led"></div>
-                        <div className="crt-led"></div>
-                        <div className="crt-led on"></div>
+                    {/* Presets */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Plus className="h-4 w-4 text-emerald-500" />
+                            <div className="font-semibold">Presets</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {presets.map((p) => (
+                                <button key={p.id} onClick={() => applyPresetName(p.name)} className="chip hover:opacity-90">
+                                    {p.name}
+                                </button>
+                            ))}
+                            <InlineAddPreset
+                                onAdd={async (name) => {
+                                    const nm = name.trim();
+                                    if (!nm) return;
+                                    await createPreset(nm);
+                                    applyPresetName(nm);
+                                }}
+                            />
+                        </div>
                     </div>
-                </div>
 
-                {/* khối base/keyboard */}
-                <div className="crt-base">
-                    <div className="crt-keys">
-                        {Array.from({ length: 18 }).map((_, i) => (
-                            <div key={`k1-${i}`} className="crt-key" />
-                        ))}
-                        {Array.from({ length: 18 }).map((_, i) => (
-                            <div key={`k2-${i}`} className="crt-key" />
-                        ))}
-                        {Array.from({ length: 12 }).map((_, i) => (
-                            <div key={`k3a-${i}`} className="crt-key" />
-                        ))}
-                        <div className="crt-key crt-space" />
-                        {Array.from({ length: 5 }).map((_, i) => (
-                            <div key={`k3b-${i}`} className="crt-key" />
-                        ))}
+                    {/* Add exercise form */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow p-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr,110px,110px,140px] gap-3">
+                            <input
+                                ref={nameRef}
+                                value={form.name ?? ""}
+                                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                                placeholder="Exercise (e.g., Bench Press)"
+                                className="rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
+                            />
+                            <Stepper label="Sets" value={form.sets ?? 3} onChange={(v) => setForm((f) => ({ ...f, sets: v }))} />
+                            <Stepper label="Reps" value={form.reps ?? 10} onChange={(v) => setForm((f) => ({ ...f, reps: v }))} />
+                            <Stepper
+                                label={`Weight (${unit})`}
+                                value={Number(form.weight ?? 20)}
+                                onChange={(v) => setForm((f) => ({ ...f, weight: v }))}
+                                step={unit === "kg" ? 2.5 : 5}
+                            />
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                            <input
+                                value={form.note ?? ""}
+                                onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                                placeholder="Note (optional)"
+                                className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
+                            />
+                            <button onClick={addExerciseFE} className="btn inline-flex items-center gap-2" disabled={loading}>
+                                <Dumbbell className="h-4 w-4" />
+                                Add
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* thiết bị băng/cassette bên phải */}
-                <div className="crt-device">
-                    <div className="crt-slot" />
+                    {/* Exercise table / list */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow overflow-hidden">
+                        <table className="table w-full hidden sm:table">
+                            <thead>
+                                <tr>
+                                    <th>Exercise</th>
+                                    <th>Sets</th>
+                                    <th>Reps</th>
+                                    <th>Weight ({unit})</th>
+                                    <th>Note</th>
+                                    <th className="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {dayLog.exercises.length === 0 ? (
+                                    <tr>
+                                        <td className="py-8 text-center text-slate-500 dark:text-slate-400" colSpan={6}>
+                                            No exercises yet
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    dayLog.exercises.map((ex) => (
+                                        <DesktopExerciseRow
+                                            key={ex.id}
+                                            ex={{ ...ex, weight: showWeight(ex.weight) }}
+                                            onEdit={async (patch) => {
+                                                const p: Partial<Exercise> = { ...patch };
+                                                if (p.weight !== undefined) p.weight = fromInputWeightToKg(Number(p.weight));
+                                                await editExerciseFE(ex.id, p);
+                                            }}
+                                            onRemove={() => removeExerciseFE(ex.id)}
+                                        />
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+
+                        {/* Mobile cards */}
+                        <div className="sm:hidden divide-y divide-slate-200 dark:divide-slate-700">
+                            {dayLog.exercises.length === 0 ? (
+                                <div className="py-6 text-center text-slate-500 dark:text-slate-400">No exercises yet</div>
+                            ) : (
+                                dayLog.exercises.map((ex) => (
+                                    <MobileExerciseCard
+                                        key={ex.id}
+                                        ex={{ ...ex, weight: showWeight(ex.weight) }}
+                                        unit={unit}
+                                        onChange={async (patch) => {
+                                            const p: Partial<Exercise> = { ...patch };
+                                            if (p.weight !== undefined) p.weight = fromInputWeightToKg(Number(p.weight));
+                                            await editExerciseFE(ex.id, p);
+                                        }}
+                                        onRemove={() => removeExerciseFE(ex.id)}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* FAB */}
+            <button
+                onClick={() => setShowQuickAdd((v) => !v)}
+                className="lg:hidden fixed bottom-5 right-5 h-12 w-12 rounded-full shadow-lg text-white bg-emerald-600 flex items-center justify-center"
+                aria-label="Quick add"
+                title="Quick add"
+            >
+                <Plus className="h-5 w-5" />
+            </button>
+
+            {showQuickAdd && (
+                <div className="lg:hidden fixed inset-0 z-50">
+                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowQuickAdd(false)} />
+                    <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t dark:border-slate-700 rounded-t-2xl p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="font-semibold">Quick Add</div>
+                            <button onClick={() => setShowQuickAdd(false)} className="text-slate-500">
+                                Close
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {presets.slice(0, 8).map((p) => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => {
+                                        applyPresetName(p.name);
+                                        setShowQuickAdd(false);
+                                    }}
+                                    className="chip"
+                                >
+                                    {p.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

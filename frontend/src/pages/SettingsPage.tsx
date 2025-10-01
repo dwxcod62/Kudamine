@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { MonthSelect } from "../components/MonthSelect";
+import { useAuthStore } from "../stores/auth";
 
-/** ===== Shared keys (match InvestmentsPage) ===== */
 const LS_SETTINGS = "invest.settings.v1";
 type InvSettings = { notifyEnabled: boolean; bandPct: number; cooldownMs: number };
 const DEFAULT_INV: InvSettings = { notifyEnabled: true, bandPct: 0.001, cooldownMs: 15000 };
 
-/** ===== Utilities for Spending part (same as your snippet) ===== */
 type SpendingStatus = "Done" | "Process" | "Skip";
 type ApplyScope = "single" | "next3" | "next6" | "next12" | "custom";
 
 const API_BASE = import.meta.env.VITE_API_BASE as string;
-const USER_ID = import.meta.env.VITE_USER_ID as string;
 
 const monthKey = (d: Date | string) => {
     const dt = typeof d === "string" ? new Date(d) : d;
@@ -38,9 +36,10 @@ const monthsBetween = (start: string, end: string) => {
 };
 const nowMonth = monthKey(new Date());
 
-/** ===== Page ===== */
 export default function SettingsPage() {
-    // ====== Investments settings (localStorage) ======
+    const user = useAuthStore((s) => s.user);
+    const USER_ID = user?.id ?? "";
+
     const [inv, setInv] = useState<InvSettings>(() => {
         try {
             const raw = localStorage.getItem(LS_SETTINGS);
@@ -53,7 +52,6 @@ export default function SettingsPage() {
         localStorage.setItem(LS_SETTINGS, JSON.stringify(inv));
     }, [inv]);
 
-    // ====== Spending quick add (future months) ======
     const apiUrl = API_BASE;
     const userId = USER_ID;
 

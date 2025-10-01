@@ -12,11 +12,13 @@ const router = Router();
  */
 
 /**
+
+/**
  * @swagger
- * /spending/templates:
+ * /spending/months:
  *   get:
  *     tags: [Spending]
- *     summary: List templates by user
+ *     summary: List distinct months (YYYY-MM) for a user
  *     parameters:
  *       - in: query
  *         name: userId
@@ -25,15 +27,25 @@ const router = Router();
  *     responses:
  *       200: { description: OK }
  */
-router.get("/templates", async (req, res) => {
-    const { userId } = req.query as any;
+router.get("/months", async (req, res) => {
+    let { userId } = req.query as any;
     if (!userId) return res.status(400).json({ message: "userId required" });
+    userId = String(userId).trim();
 
-    const items = await prisma.spendingTemplate.findMany({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
-    });
-    res.json(items);
+    try {
+        const rows = await prisma.spendingEntry.groupBy({
+            by: ["monthKey"],
+            where: { userId },
+            _count: { _all: true },
+            orderBy: { monthKey: "desc" },
+        });
+
+        // rows: [{ monthKey: "2025-09", _count: { _all: 12 } }, ...]
+        res.json(rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Server error" });
+    }
 });
 
 /**
@@ -173,55 +185,57 @@ router.get("/entries", async (req, res) => {
 /**
  * @swagger
  * /spending/entries:
- *   post:
+ *   get:
  *     tags: [Spending]
- *     summary: Create a spending entry
- *     parameters: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId, title, dueDate, amount, monthKey]
- *             properties:
- *               userId: { type: string }
- *               templateId: { type: string }
- *               title: { type: string }
- *               dueDate: { type: string, example: "2025-09-22" }
- *               amount: { type: number }
- *               status:
- *                 type: string
- *                 enum: [Done, Process, Skip]
- *               monthKey: { type: string, example: "2025-09" }
+ *     summary: List entries by user (optionally filter by monthKey), sorted by monthKey desc then dueDate asc
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: monthKey
+ *         description: Filter by month key (YYYY-MM)
+ *         schema: { type: string, example: "2025-09" }
  *     responses:
- *       201: { description: Created }
+ *       200: { description: OK }
  */
-router.post("/entries", async (req, res) => {
-    const { userId, templateId, title, dueDate, amount, status, monthKey } = req.body as {
-        userId: string;
-        templateId?: string;
-        title: string;
-        dueDate: string;
-        amount: number | string;
-        status?: SpendingStatus;
-        monthKey: string;
-    };
-    if (!userId || !title || !dueDate || !amount || !monthKey) {
-        return res.status(400).json({ message: "userId, title, dueDate, amount, monthKey required" });
+router.get("/entries", async (req, res) => {
+    let { userId, monthKey } = req.query as any;
+    if (!userId) return res.status(400).json({ message: "userId required" });
+
+    userId = String(userId).trim();
+    monthKey = monthKey ? String(monthKey).trim() : undefined;
+
+    // validate monthKey nếu có
+    if (monthKey && !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
+        return res.status(400).json({ message: "monthKey phải dạng YYYY-MM" });
     }
-    const created = await prisma.spendingEntry.create({
-        data: {
-            userId,
-            templateId: templateId ?? null,
-            title,
-            dueDate: new Date(dueDate),
-            amount: amount as any,
-            status: status ?? "Process",
-            monthKey,
-        },
-    });
-    res.status(201).json(created);
+
+    try {
+        const entries = await prisma.spendingEntry.findMany({
+            where: {
+                userId,
+                monthKey: monthKey ?? undefined, // nếu không truyền thì không lọc
+            },
+            orderBy: [
+                { monthKey: "desc" }, // tháng mới trước
+                { dueDate: "asc" }, // trong tháng: ngày sớm trước
+                { createdAt: "desc" }, // cùng ngày: mới tạo trước
+            ],
+        });
+
+        // Decimal -> number cho FE
+        const normalized = entries.map((e) => ({
+            ...e,
+            amount: Number(e.amount),
+        }));
+
+        res.json(normalized);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
 });
 
 /**

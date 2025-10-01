@@ -1,98 +1,36 @@
-// src/pages/Gymlog.tsx
-import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Dumbbell, Pencil, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
+// src/pages/GymLogPage.tsx
+import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Dumbbell, Plus, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DayLogFE } from "../hooks/useGymData";
 import { useGymData } from "../hooks/useGymData";
 import { useAuthStore } from "../stores/auth";
 
-/** ================= Types (FE local) ================ */
-type Exercise = {
-    id: string;
-    name: string;
-    sets: number;
-    reps: number;
-    weight: number; // FE hiển thị theo unit, lưu/patch bằng kg
-    note?: string | null;
-};
+// Components
+import { DesktopExerciseRow, type Exercise } from "../components/gym/DesktopExerciseRow";
+import { InlineAddPreset } from "../components/gym/InlineAddPreset";
+import { MobileExerciseCard } from "../components/gym/MobileExerciseCard";
+import { MonthCalendar } from "../components/gym/MonthCalendar";
+import { Stepper } from "../components/gym/Stepper";
+import { WeekScroller } from "../components/gym/WeekScroller";
+
+// Utils
+import { useLocalStorage } from "../hooks/useLocalStorage";
+import { addDays, addMonths, parseISO, startOfMonth, startOfWeek, ymdLocal } from "../utils/date";
+import { refreshOneDay } from "../utils/gymMap";
+import { norm } from "../utils/strings";
+import { kgToLb, lbToKg, type Unit } from "../utils/units";
+
+/* =================== Types =================== */
 type DaysDB = Record<string, DayLogFE>;
-type Unit = "kg" | "lb";
 
-/** =============== Date helpers (LOCAL) =============== */
-const ymdLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-const parseISO = (s: string) => {
-    const [y, m, dd] = s.split("-").map(Number);
-    return new Date(y, (m ?? 1) - 1, dd ?? 1);
-};
-
-const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-const startOfWeek = (d: Date) => addDays(d, -d.getDay()); // Sun
-const isSameDay = (a: Date, b: Date) => ymdLocal(a) === ymdLocal(b);
-const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
-const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
-const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
-
-/** =============== Unit helpers =============== */
-const kgToLb = (kg: number) => Math.round(kg * 2.20462 * 10) / 10;
-const lbToKg = (lb: number) => Math.round((lb / 2.20462) * 10) / 10;
-
-/** =============== Normalizers =============== */
-const toYMD = (s: string) => s.slice(0, 10); // "YYYY-MM-DD" từ ISO full
-const norm = (s: string) => s.trim().toLowerCase();
-
-const mapApiDayToFE = (d: any): DayLogFE => ({
-    id: d.id,
-    date: toYMD(d.dateYmd),
-    done: !!d.done,
-    note: d.note ?? "",
-    focus: (d.focus ?? []).map((f: any) => (typeof f === "string" ? f : f?.tag)).filter(Boolean),
-    exercises: (d.exercises ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        sets: Number(e.sets),
-        reps: Number(e.reps),
-        weight: Number(e.weightKg),
-        note: e.note ?? "",
-    })),
-});
-
-async function refreshOneDay(dayId: string, setDays: Dispatch<SetStateAction<DaysDB>>) {
-    const d = await (await import("../lib/gymApi")).GymApi.getDay(dayId); // gọi /gym/days/:id
-    const ymd = toYMD(d.dateYmd);
-    const mapped = mapApiDayToFE(d);
-    setDays((prev) => ({ ...prev, [ymd]: { ...(prev[ymd] ?? {}), ...mapped } }));
-}
-
-
-/** =============== Local-storage hook (unit only) =============== */
-function useLocalStorage<T>(key: string, init: T) {
-    const [state, setState] = useState<T>(() => {
-        try {
-            const raw = localStorage.getItem(key);
-            return raw ? (JSON.parse(raw) as T) : init;
-        } catch {
-            return init;
-        }
-    });
-    useEffect(() => {
-        try {
-            localStorage.setItem(key, JSON.stringify(state));
-        } catch {}
-    }, [key, state]);
-    return [state, setState] as const;
-}
-
-/** =============== Constants =============== */
+/* =================== Constants =================== */
 const KEY_UNIT = "gym-unit.v1";
 const MUSCLE_PRESETS = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Push", "Pull", "Full Body"];
 
-/** =================== Page =================== */
 export default function GymLogPage() {
     const user = useAuthStore((s) => s.user);
     const userId = user?.id ?? "";
 
-    // ===== API-backed state via hook =====
     const {
         days,
         setDays,
@@ -110,7 +48,6 @@ export default function GymLogPage() {
         deleteExercise,
     } = useGymData(userId);
 
-    // ===== FE state =====
     const [unit, setUnit] = useLocalStorage<Unit>(KEY_UNIT, "kg");
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
     const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
@@ -120,29 +57,20 @@ export default function GymLogPage() {
     const selKey = ymdLocal(selectedDate);
     const today = new Date();
 
-    // === Load month range 03/09
+    // Load current month range
     useEffect(() => {
         if (!userId) return;
         const first = startOfMonth(viewMonth);
         const endExclusive = addMonths(first, 1);
-        loadRange(ymdLocal(first), ymdLocal(endExclusive)); // gọi GET /gym/days
+        loadRange(ymdLocal(first), ymdLocal(endExclusive));
     }, [userId, viewMonth, loadRange]);
 
-    // useEffect(() => {
-    //     if (!userId) return;
-    //     const first = startOfMonth(viewMonth);
-    //     const endExclusive = addMonths(first, 1);
-    //     // truyền local YMD để server parse date-only (tùy API)
-    //     loadRange(ymdLocal(first), ymdLocal(endExclusive));
-    // }, [userId, viewMonth, loadRange]);
-
-    // === Load presets once ===
+    // Load presets once
     useEffect(() => {
         if (!userId) return;
         loadPresets();
     }, [userId, loadPresets]);
 
-    // Current day (from cache) hoặc default rỗng
     const dayLog: DayLogFE = useMemo(
         () =>
             days[selKey] ?? {
@@ -162,7 +90,6 @@ export default function GymLogPage() {
         return created.id;
     }
 
-    // Suggest last weight theo tên bài tập
     const getLastWeightKg = (name: string) => {
         const keys = Object.keys(days).sort((a, b) => (a < b ? 1 : -1));
         for (const k of keys) {
@@ -172,7 +99,6 @@ export default function GymLogPage() {
         return undefined;
     };
 
-    // Keep week anchor in sync
     useEffect(() => {
         setWeekAnchor(startOfWeek(selectedDate));
     }, [selectedDate]);
@@ -185,7 +111,7 @@ export default function GymLogPage() {
         setSelectedDate(newSelected);
     };
 
-    // ===== Add exercise form =====
+    // Add exercise form state
     const [form, setForm] = useState<Partial<Exercise>>({
         name: "",
         sets: 3,
@@ -199,11 +125,17 @@ export default function GymLogPage() {
         const lastKg = getLastWeightKg(name);
         const baseKg = lastKg ?? 20;
         const shown = unit === "kg" ? baseKg : kgToLb(baseKg);
-        setForm({ name, sets: 3, reps: 10, weight: Number(shown.toFixed(1)), note: "" });
+        setForm({
+            name,
+            sets: 3,
+            reps: 10,
+            weight: Number(shown.toFixed(1)),
+            note: "",
+        });
         nameRef.current?.focus();
     };
 
-    const addExercise = async () => {
+    const addExerciseFE = async () => {
         const nm = form.name?.trim();
         if (!nm) {
             nameRef.current?.focus();
@@ -269,13 +201,13 @@ export default function GymLogPage() {
 
         refreshOneDay(dayId, setDays);
     };
+
     const toggleDoneFE = async () => {
         const dayId = await ensureDayId();
         await updateDay(dayId, { done: !dayLog.done });
         await refreshOneDay(dayId, setDays);
     };
 
-    // month label + month map (Map<string, DayLogFE> để giữ Calendar)
     const monthLabel = useMemo(() => viewMonth.toLocaleString("en-US", { month: "long", year: "numeric" }), [viewMonth]);
 
     const monthMap = useMemo(() => {
@@ -297,13 +229,12 @@ export default function GymLogPage() {
         return <div className="p-6 text-center text-slate-600 dark:text-slate-300">You need to log in to use Gym Log.</div>;
     }
 
-    // 30/09
+    // Ensure day details hydrated when switching dates
     useEffect(() => {
         (async () => {
             if (!dayLog?.id) return;
-
             if ((dayLog.exercises?.length ?? 0) === 0) {
-                await refreshOneDay(dayLog.id, setDays); // gọi GET /gym/days/:id
+                await refreshOneDay(dayLog.id, setDays);
             }
         })();
     }, [selKey, dayLog.id]);
@@ -383,7 +314,7 @@ export default function GymLogPage() {
                         selectedDate={selectedDate}
                         onSelect={(d) => setSelectedDate(d)}
                         today={today}
-                        monthMap={days}
+                        monthMap={days as DaysDB}
                         onShift={shiftWeek}
                     />
                 </div>
@@ -396,7 +327,12 @@ export default function GymLogPage() {
                             <div>
                                 <div className="text-xs text-slate-500 dark:text-slate-400">Selected</div>
                                 <div className="text-lg sm:text-xl font-bold">
-                                    {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                                    {selectedDate.toLocaleDateString("en-US", {
+                                        weekday: "long",
+                                        month: "long",
+                                        day: "numeric",
+                                        year: "numeric",
+                                    })}
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -426,7 +362,6 @@ export default function GymLogPage() {
 
                         {/* Focus chips */}
                         <div className="mt-3 flex flex-wrap gap-2">
-                            {/* {console.log(dayLog)} */}
                             {MUSCLE_PRESETS.map((m) => {
                                 const active = dayLog.focus.some((t) => norm(t) === norm(m));
                                 return (
@@ -493,7 +428,7 @@ export default function GymLogPage() {
                                 placeholder="Note (optional)"
                                 className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
                             />
-                            <button onClick={addExercise} className="btn inline-flex items-center gap-2" disabled={loading}>
+                            <button onClick={addExerciseFE} className="btn inline-flex items-center gap-2" disabled={loading}>
                                 <Dumbbell className="h-4 w-4" />
                                 Add
                             </button>
@@ -598,380 +533,6 @@ export default function GymLogPage() {
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-/** =================== Components =================== */
-
-function MonthCalendar({
-    viewMonth,
-    selectedDate,
-    onSelect,
-    monthMap,
-    today,
-}: {
-    viewMonth: Date;
-    selectedDate: Date;
-    onSelect: (d: Date) => void;
-    monthMap: Map<string, DayLogFE>;
-    today: Date;
-}) {
-    const first = startOfMonth(viewMonth);
-    const last = endOfMonth(viewMonth);
-    const lead = first.getDay();
-    const daysInMonth = last.getDate();
-    const cells: { date: Date; inMonth: boolean }[] = [];
-
-    // prev tail
-    const prevLast = endOfMonth(addMonths(viewMonth, -1)).getDate();
-    for (let i = lead - 1; i >= 0; i--)
-        cells.push({ date: new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, prevLast - i), inMonth: false });
-    // current
-    for (let d = 1; d <= daysInMonth; d++) cells.push({ date: new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d), inMonth: true });
-    // fill to 42
-    while (cells.length < 42) {
-        const lastCell = cells[cells.length - 1]?.date ?? last;
-        const next = new Date(lastCell);
-        next.setDate(next.getDate() + 1);
-        cells.push({ date: next, inMonth: false });
-    }
-
-    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-    return (
-        <div className="p-4">
-            <div className="grid grid-cols-7 gap-2 text-xs text-slate-500 dark:text-slate-400 mb-2">
-                {weekdays.map((w) => (
-                    <div key={w} className="text-center">
-                        {w}
-                    </div>
-                ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2">
-                {cells.map(({ date, inMonth }, idx) => {
-                    const k = ymdLocal(date);
-                    const log = monthMap.get(k);
-                    const selected = isSameDay(date, selectedDate);
-                    const isToday = isSameDay(date, today);
-                    return (
-                        <button
-                            key={k + idx}
-                            onClick={() => onSelect(date)}
-                            className={`aspect-square rounded-xl border text-sm flex flex-col items-center justify-center transition hover:shadow-sm
-                ${selected ? "border-emerald-500" : "border-slate-200 dark:border-slate-700"}
-                ${inMonth ? "bg-white dark:bg-slate-900" : "bg-slate-50 dark:bg-slate-800/50 text-slate-400"}`}
-                        >
-                            <div className="flex items-center gap-1">
-                                <span className={`font-semibold ${isToday ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{date.getDate()}</span>
-                                {log?.done && <Check className="h-3.5 w-3.5 text-emerald-500" />}
-                            </div>
-                            <div className="mt-1 flex gap-1 flex-wrap justify-center max-w-[90%]">
-                                {(log?.focus ?? []).slice(0, 2).map((t) => (
-                                    <span
-                                        key={t}
-                                        className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                    >
-                                        {t}
-                                    </span>
-                                ))}
-                                {(log?.focus?.length ?? 0) > 2 && (
-                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                        +{(log?.focus?.length ?? 0) - 2}
-                                    </span>
-                                )}
-                            </div>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-function WeekScroller({
-    anchorDate,
-    selectedDate,
-    onSelect,
-    today,
-    monthMap,
-    onShift,
-}: {
-    anchorDate: Date;
-    selectedDate: Date;
-    onSelect: (d: Date) => void;
-    today: Date;
-    monthMap: DaysDB;
-    onShift: (days: number) => void;
-}) {
-    const start = startOfWeek(anchorDate);
-    const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-    const rangeLabel = `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })}–${addDays(
-        start,
-        6
-    ).getDate()}, ${start.getFullYear()}`;
-
-    return (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow px-2 py-3">
-            <div className="flex items-center justify-between px-2 mb-1 text-xs text-slate-500 dark:text-slate-400">
-                <button
-                    onClick={() => onShift(-7)}
-                    className="rounded-md border px-2 py-1 dark:border-slate-700"
-                    aria-label="Previous week"
-                    title="Previous week"
-                >
-                    <ChevronLeft className="h-4 w-4" />
-                </button>
-
-                <span>{rangeLabel}</span>
-
-                <button
-                    onClick={() => onShift(7)}
-                    className="rounded-md border px-2 py-1 dark:border-slate-700"
-                    aria-label="Next week"
-                    title="Next week"
-                >
-                    <ChevronRight className="h-4 w-4" />
-                </button>
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto no-scrollbar px-2">
-                {days.map((d) => {
-                    const k = ymdLocal(d);
-                    const log = monthMap[k];
-                    const selected = isSameDay(d, selectedDate);
-                    const isToday = isSameDay(d, today);
-                    return (
-                        <button
-                            key={k}
-                            onClick={() => onSelect(d)}
-                            className={`flex-1 min-w-[48px] aspect-square rounded-xl border text-sm flex flex-col items-center justify-center
-                ${selected ? "border-emerald-500" : "border-slate-200 dark:border-slate-700"}
-                ${log?.done ? "bg-emerald-50 dark:bg-emerald-900/20" : "bg-white dark:bg-slate-900"}`}
-                            title={d.toDateString()}
-                        >
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                {d.toLocaleDateString("en-US", { weekday: "short" })}
-                            </div>
-                            <div className={`font-semibold ${isToday ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{d.getDate()}</div>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-function Stepper({
-    label,
-    value,
-    onChange,
-    step = 1,
-    min = 0,
-}: {
-    label: string;
-    value: number;
-    onChange: (v: number) => void;
-    step?: number;
-    min?: number;
-}) {
-    return (
-        <div className="flex flex-col">
-            <label className="text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-            <div className="flex items-center rounded-lg border dark:border-slate-700 overflow-hidden">
-                <button
-                    onClick={() => onChange(Math.max(min, Number((value - step).toFixed(1))))}
-                    className="px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                    -
-                </button>
-                <input
-                    type="number"
-                    value={value}
-                    onChange={(e) => onChange(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm outline-none bg-transparent"
-                />
-                <button
-                    onClick={() => onChange(Number((value + step).toFixed(1)))}
-                    className="px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                    +
-                </button>
-            </div>
-        </div>
-    );
-}
-
-function DesktopExerciseRow({ ex, onEdit, onRemove }: { ex: Exercise; onEdit: (patch: Partial<Exercise>) => void; onRemove: () => void }) {
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState<Exercise>(ex);
-    useEffect(() => setDraft(ex), [ex.id]);
-
-    if (!editing) {
-        return (
-            <tr className="border-t">
-                <td className="px-3 py-2">{ex.name}</td>
-                <td className="px-3 py-2">{ex.sets}</td>
-                <td className="px-3 py-2">{ex.reps}</td>
-                <td className="px-3 py-2">{ex.weight}</td>
-                <td className="px-3 py-2 text-slate-500">{ex.note || "-"}</td>
-                <td className="px-3 py-2 text-right">
-                    <div className="inline-flex gap-2">
-                        <button
-                            onClick={() => setEditing(true)}
-                            className="rounded-md border px-2 py-1 text-xs dark:border-slate-700 inline-flex items-center gap-1"
-                        >
-                            <Pencil className="h-3.5 w-3.5" /> Edit
-                        </button>
-                        <button
-                            onClick={onRemove}
-                            className="rounded-md border px-2 py-1 text-xs dark:border-slate-700 inline-flex items-center gap-1 text-rose-600 dark:text-rose-400"
-                        >
-                            <Trash2 className="h-3.5 w-3.5" /> Remove
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        );
-    }
-
-    return (
-        <tr className="border-t bg-slate-50 dark:bg-slate-800/40">
-            <td className="px-3 py-2">
-                <input
-                    value={draft.name}
-                    onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                    className="w-full rounded-lg border px-2 py-1 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                />
-            </td>
-            <td className="px-3 py-2">
-                <input
-                    type="number"
-                    value={draft.sets}
-                    onChange={(e) => setDraft((d) => ({ ...d, sets: Number(e.target.value) }))}
-                    className="w-full rounded-lg border px-2 py-1 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                />
-            </td>
-            <td className="px-3 py-2">
-                <input
-                    type="number"
-                    value={draft.reps}
-                    onChange={(e) => setDraft((d) => ({ ...d, reps: Number(e.target.value) }))}
-                    className="w-full rounded-lg border px-2 py-1 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                />
-            </td>
-            <td className="px-3 py-2">
-                <input
-                    type="number"
-                    value={draft.weight}
-                    onChange={(e) => setDraft((d) => ({ ...d, weight: Number(e.target.value) }))}
-                    className="w-full rounded-lg border px-2 py-1 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                />
-            </td>
-            <td className="px-3 py-2">
-                <input
-                    value={draft.note ?? ""}
-                    onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
-                    className="w-full rounded-lg border px-2 py-1 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                />
-            </td>
-            <td className="px-3 py-2 text-right">
-                <div className="inline-flex gap-2">
-                    <button
-                        onClick={() => {
-                            onEdit(draft);
-                            setEditing(false);
-                        }}
-                        className="rounded-md border px-2 py-1 text-xs dark:border-slate-700 inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
-                    >
-                        <Check className="h-3.5 w-3.5" /> Save
-                    </button>
-                    <button
-                        onClick={() => {
-                            setDraft(ex);
-                            setEditing(false);
-                        }}
-                        className="rounded-md border px-2 py-1 text-xs dark:border-slate-700"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </td>
-        </tr>
-    );
-}
-
-function MobileExerciseCard({
-    ex,
-    unit,
-    onChange,
-    onRemove,
-}: {
-    ex: Exercise;
-    unit: Unit;
-    onChange: (patch: Partial<Exercise>) => void;
-    onRemove: () => void;
-}) {
-    return (
-        <div className="p-3">
-            <div className="flex items-center justify-between gap-2">
-                <div className="font-semibold">{ex.name}</div>
-                <button onClick={onRemove} className="text-rose-600 dark:text-rose-400 text-xs inline-flex items-center gap-1">
-                    <Trash2 className="h-3.5 w-3.5" /> Remove
-                </button>
-            </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-                <Stepper label="Sets" value={ex.sets} onChange={(v) => onChange({ sets: v })} />
-                <Stepper label="Reps" value={ex.reps} onChange={(v) => onChange({ reps: v })} />
-                <Stepper label={`Wt (${unit})`} value={ex.weight} onChange={(v) => onChange({ weight: v })} step={unit === "kg" ? 2.5 : 5} />
-            </div>
-            <input
-                value={ex.note ?? ""}
-                onChange={(e) => onChange({ note: e.target.value })}
-                placeholder="Note"
-                className="mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-            />
-        </div>
-    );
-}
-
-function InlineAddPreset({ onAdd }: { onAdd: (name: string) => void | Promise<void> }) {
-    const [open, setOpen] = useState(false);
-    const [name, setName] = useState("");
-    if (!open) {
-        return (
-            <button onClick={() => setOpen(true)} className="btn-ghost text-sm">
-                + Custom
-            </button>
-        );
-    }
-    return (
-        <div className="flex items-center gap-2">
-            <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="New preset"
-                className="rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-            />
-            <button
-                onClick={async () => {
-                    await onAdd(name);
-                    setName("");
-                    setOpen(false);
-                }}
-                className="btn text-sm"
-            >
-                Add
-            </button>
-            <button
-                onClick={() => {
-                    setName("");
-                    setOpen(false);
-                }}
-                className="btn-ghost text-sm"
-            >
-                Cancel
-            </button>
         </div>
     );
 }
