@@ -1,7 +1,16 @@
-import { PrismaClient } from "@prisma/client";
+import type { $Enums } from "@prisma/client";
+import { MuscleDetailed as MuscleDetailedEnum, PrismaClient } from "@prisma/client";
 import { Router } from "express";
+
 const prisma = new PrismaClient();
 const r = Router();
+
+type MuscleDetailed = $Enums.MuscleDetailed;
+const MUSCLE_DETAILED = Object.values(MuscleDetailedEnum) as MuscleDetailed[];
+
+function isMuscleDetailed(v: any): v is MuscleDetailed {
+    return MUSCLE_DETAILED.includes(v);
+}
 
 /**
  * @swagger
@@ -384,22 +393,33 @@ r.delete("/exercises/:id", async (req, res) => {
  * /gym/presets:
  *   get:
  *     tags: [Exercises]
- *     summary: List presets by user
+ *     summary: List presets
  *     parameters:
  *       - in: query
- *         name: userId
  *         required: true
  *         schema: { type: string }
  *     responses:
  *       200: { description: OK }
  */
 r.get("/presets", async (req, res) => {
-    const { userId } = req.query as any;
-    if (!userId) return res.status(400).json({ message: "userId required" });
+    const { detail } = req.query as any;
+
+    if (detail && !isMuscleDetailed(detail)) {
+        return res.status(400).json({ message: "invalid detail" });
+    }
+
     const presets = await prisma.gymPreset.findMany({
-        where: { userId },
+        where: detail
+            ? {
+                  targets: {
+                      some: { detail: detail as MuscleDetailed },
+                  },
+              }
+            : undefined,
         orderBy: { name: "asc" },
+        include: { targets: true },
     });
+
     res.json(presets);
 });
 
@@ -409,25 +429,47 @@ r.get("/presets", async (req, res) => {
  *   post:
  *     tags: [Exercises]
  *     summary: Create preset (unique per userId+name)
- *     parameters: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [userId, name]
+ *             required: [userId, name, imageUrl, instructions]
  *             properties:
  *               userId: { type: string }
  *               name: { type: string }
+ *               imageUrl: { type: string }
+ *               instructions: { type: string }
+ *               targets:
+ *                 type: array
+ *                 items: { type: string, example: "Quads" }
  *     responses:
  *       201: { description: Created }
  */
 r.post("/presets", async (req, res) => {
-    const { userId, name } = req.body;
-    if (!userId || !name) return res.status(400).json({ message: "userId & name required" });
+    const { name, imageUrl, instructions, targets } = req.body as {
+        name?: string;
+        imageUrl?: string;
+        instructions?: string;
+        targets?: string[];
+    };
+    if (!name || !imageUrl || !instructions) {
+        return res.status(400).json({ message: "userId, name, imageUrl, instructions required" });
+    }
+    if (targets && (!Array.isArray(targets) || targets.some((t) => !isMuscleDetailed(t)))) {
+        return res.status(400).json({ message: "invalid targets[]" });
+    }
     try {
-        const preset = await prisma.gymPreset.create({ data: { userId, name } });
+        const preset = await prisma.gymPreset.create({
+            data: {
+                name,
+                imageUrl,
+                instructions,
+                targets: targets?.length ? { create: targets.map((detail) => ({ detail: detail as MuscleDetailed })) } : undefined,
+            },
+            include: { targets: true },
+        });
         res.status(201).json(preset);
     } catch (e: any) {
         res.status(400).json({ message: e?.message ?? "Create failed" });
@@ -458,4 +500,168 @@ r.delete("/presets/:id", async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /gym/muscles/detailed:
+ *   get:
+ *     tags: [Exercises]
+ *     summary: List all MuscleDetailed options
+ *     responses:
+ *       200: { description: OK }
+ */
+r.get("/muscles/detailed", (_req, res) => {
+    res.json(MUSCLE_DETAILED);
+});
+
 export default r;
+
+/**
+ * @swagger
+ * /gym/presets/{id}:
+ *   get:
+ *     tags: [Exercises]
+ *     summary: Get a preset (include targets)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       404: { description: Not found }
+ */
+r.get("/presets/:id", async (req, res) => {
+    const preset = await prisma.gymPreset.findUnique({
+        where: { id: req.params.id },
+        include: { targets: true },
+    });
+    if (!preset) return res.status(404).json({ message: "Not found" });
+    res.json(preset);
+});
+
+/**
+ * @swagger
+ * /gym/presets/{id}:
+ *   patch:
+ *     tags: [Exercises]
+ *     summary: Update preset meta (name, imageUrl, instructions)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               imageUrl: { type: string }
+ *               instructions: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       404: { description: Not found }
+ */
+r.patch("/presets/:id", async (req, res) => {
+    const { name, imageUrl, instructions } = req.body as {
+        name?: string;
+        imageUrl?: string;
+        instructions?: string;
+    };
+    try {
+        const updated = await prisma.gymPreset.update({
+            where: { id: req.params.id },
+            data: { name, imageUrl, instructions },
+        });
+        res.json(updated);
+    } catch (e) {
+        res.status(404).json({ message: "Not found" });
+    }
+});
+
+/**
+ * @swagger
+ * /gym/presets/{id}/targets:
+ *   post:
+ *     tags: [Exercises]
+ *     summary: Add target muscles to a preset (upsert)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [details]
+ *             properties:
+ *               details:
+ *                 type: array
+ *                 items: { type: string, example: "Quads" }
+ *     responses:
+ *       200: { description: OK }
+ */
+r.post("/presets/:id/targets", async (req, res) => {
+    const { details } = req.body as { details: string[] };
+    if (!Array.isArray(details) || details.length === 0) {
+        return res.status(400).json({ message: "details[] required" });
+    }
+    if (details.some((d) => !isMuscleDetailed(d))) {
+        return res.status(400).json({ message: "invalid details[]" });
+    }
+    const presetId = req.params.id;
+
+    try {
+        await prisma.gymPreset.findUniqueOrThrow({ where: { id: presetId }, select: { id: true } });
+    } catch {
+        return res.status(404).json({ message: "Preset not found" });
+    }
+
+    const created = await prisma.$transaction(
+        details.map((detail) =>
+            prisma.gymPresetTarget.upsert({
+                where: { presetId_detail: { presetId, detail: detail as MuscleDetailed } },
+                update: {},
+                create: { presetId, detail: detail as MuscleDetailed },
+            })
+        )
+    );
+    res.json(created);
+});
+
+/**
+ * @swagger
+ * /gym/presets/{id}/targets/{detail}:
+ *   delete:
+ *     tags: [Exercises]
+ *     summary: Remove a target muscle from a preset
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: detail
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: OK }
+ *       404: { description: Not found }
+ */
+r.delete("/presets/:id/targets/:detail", async (req, res) => {
+    const { id, detail } = req.params as { id: string; detail: string };
+    if (!isMuscleDetailed(detail)) return res.status(400).json({ message: "invalid detail" });
+    try {
+        await prisma.gymPresetTarget.delete({
+            where: { presetId_detail: { presetId: id, detail: detail as MuscleDetailed } },
+        });
+        res.json({ ok: true });
+    } catch {
+        res.status(404).json({ message: "Not found" });
+    }
+});

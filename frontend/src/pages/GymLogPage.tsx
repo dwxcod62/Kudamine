@@ -441,6 +441,7 @@ export default function GymLogPage() {
                             <thead>
                                 <tr>
                                     <th>Exercise</th>
+                                    <th>Focus</th>
                                     <th>Sets</th>
                                     <th>Reps</th>
                                     <th>Weight ({unit})</th>

@@ -4,8 +4,8 @@ import type { GymDay, GymPreset } from "../lib/gymApi";
 import { GymApi } from "../lib/gymApi";
 
 export type DayLogFE = {
-    id: string; // id day (server)
-    date: string; // yyyy-mm-dd
+    id: string;
+    date: string;
     done: boolean;
     focus: string[];
     exercises: {
@@ -13,7 +13,7 @@ export type DayLogFE = {
         name: string;
         sets: number;
         reps: number;
-        weight: number; // luôn kg trong FE (UI tự đổi kg/lb khi render)
+        weight: number;
         note?: string | null;
     }[];
     note?: string | null;
@@ -202,7 +202,7 @@ export function useGymData(userId: string) {
     const addExercises = useCallback(
         async (dayId: string, items: { name: string; sets: number; reps: number; weightKg: number; note?: string }[]) => {
             await GymApi.addExercises(dayId, items);
-            await refreshOneDay(dayId); // luôn refetch để đồng bộ weight/note server-side
+            await refreshOneDay(dayId);
         },
         [refreshOneDay]
     );
@@ -230,7 +230,7 @@ export function useGymData(userId: string) {
     /** ========== PRESETS ========== */
     const loadPresets = useCallback(async () => {
         if (!userId) return;
-        const list = await GymApi.listPresets(userId);
+        const list = await GymApi.listPresets();
         setPresets(list);
     }, [userId]);
 

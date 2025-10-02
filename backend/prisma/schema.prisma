@@ -27,7 +27,6 @@ model User {
   createdAt      DateTime           @default(now())
   settings       UserSettings?
   gymDays        GymDay[]
-  gymPresets     GymPreset[]
   playlists      Playlist[]
   spendTemplates SpendingTemplate[]
   spendEntries   SpendingEntry[]
@@ -81,14 +80,49 @@ model GymExercise {
   @@index([dayId])
 }
 
-model GymPreset {
-  id     String @id @default(uuid())
-  userId String
-  name   String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, name])
+// ====== MuscleDetailed thay cho Muscle ======
+enum MuscleDetailed {
+  UpperChest
+  MiddleChest
+  LowerChest
+  Lats
+  UpperBack
+  LowerBack
+  FrontDelts
+  LateralDelts
+  RearDelts
+  Biceps
+  Triceps
+  Forearms
+  Quads
+  Hamstrings
+  Glutes
+  Calves
+  Abs
+  Obliques
+  FullBody
 }
+
+model GymPresetTarget {
+  presetId String
+  detail   MuscleDetailed
+
+  preset GymPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@id([presetId, detail])
+  @@index([detail])
+}
+
+  model GymPreset {
+    id           String  @id @default(uuid())
+    name         String
+    imageUrl     String?
+    instructions String?
+
+    targets GymPresetTarget[]
+
+    @@unique([name])
+  }
 
 model Playlist {
   id        String   @id @default(uuid())
@@ -232,9 +266,9 @@ model PriceAlert {
   security Security          @relation(fields: [securityId], references: [id], onDelete: Cascade)
   logs     NotificationLog[]
 
+  @@unique([userId, securityId])
   @@index([userId])
   @@index([securityId])
-  @@unique([userId, securityId])
 }
 
 model NotificationLog {
