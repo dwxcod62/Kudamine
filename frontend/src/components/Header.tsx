@@ -2,11 +2,13 @@
 import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Avatar from "../assets/ava.png";
+import { useAuthStore } from "../stores/auth";
 import { IconBell, IconSun } from "./common/Icons";
 
 type Noti = { id: string; title: string; time: string; read?: boolean; desc?: string };
 
 export function Header({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
+    const user = useAuthStore((s) => s.user);
     const [isDark, setIsDark] = useState(false);
     const [open, setOpen] = useState(false);
     const [notis, setNotis] = useState<Noti[]>([
@@ -42,7 +44,7 @@ export function Header({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
                     <Menu className="h-5 w-5" />
                 </button>
                 <div>
-                    <div className="text-slate-700 text-base sm:text-lg font-semibold">Welcome, Kudamii!</div>
+                    <div className="text-slate-700 text-base sm:text-lg font-semibold">Welcome, {user?.name || "Duck"}!</div>
                 </div>
             </div>
 

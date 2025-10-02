@@ -1,538 +1,494 @@
-// src/pages/GymLogPage.tsx
-import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Dumbbell, Plus, Settings as SettingsIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { DayLogFE } from "../hooks/useGymData";
-import { useGymData } from "../hooks/useGymData";
-import { useAuthStore } from "../stores/auth";
+import { Dumbbell, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
-// Components
-import { DesktopExerciseRow, type Exercise } from "../components/gym/DesktopExerciseRow";
-import { InlineAddPreset } from "../components/gym/InlineAddPreset";
-import { MobileExerciseCard } from "../components/gym/MobileExerciseCard";
-import { MonthCalendar } from "../components/gym/MonthCalendar";
-import { Stepper } from "../components/gym/Stepper";
-import { WeekScroller } from "../components/gym/WeekScroller";
+/* ========= Taxonomy ========= */
 
-// Utils
-import { useLocalStorage } from "../hooks/useLocalStorage";
-import { addDays, addMonths, parseISO, startOfMonth, startOfWeek, ymdLocal } from "../utils/date";
-import { refreshOneDay } from "../utils/gymMap";
-import { norm } from "../utils/strings";
-import { kgToLb, lbToKg, type Unit } from "../utils/units";
+// Chi tiết mới
+type MuscleDetailed =
+    // Chest
+    | "Upper Chest"
+    | "Middle Chest"
+    | "Lower Chest"
+    // Back
+    | "Lats"
+    | "Upper Back"
+    | "Lower Back"
+    // Shoulders
+    | "Front Delts"
+    | "Lateral Delts"
+    | "Rear Delts"
+    // Arms
+    | "Biceps"
+    | "Triceps"
+    | "Forearms"
+    // Legs
+    | "Quads"
+    | "Hamstrings"
+    | "Glutes"
+    | "Calves"
+    // Core
+    | "Abs"
+    | "Obliques"
+    // Other
+    | "Full Body";
 
-/* =================== Types =================== */
-type DaysDB = Record<string, DayLogFE>;
+// Giữ legacy để code cũ/mocks không lỗi, nhưng sẽ normalize lúc load
+type LegacyMuscle = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Core" | "Push" | "Pull" | "Full Body";
 
-/* =================== Constants =================== */
-const KEY_UNIT = "gym-unit.v1";
-const MUSCLE_PRESETS = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Push", "Pull", "Full Body"];
+// Muscle cuối dùng trong app (đã normalize về nhóm chi tiết)
+export type Muscle = MuscleDetailed | LegacyMuscle;
 
-export default function GymLogPage() {
-    const user = useAuthStore((s) => s.user);
-    const userId = user?.id ?? "";
+// Dùng cho filter hiển thị (optgroup)
+const MUSCLE_OPTIONS_GROUPED: Array<{ label: string; items: MuscleDetailed[] }> = [
+    { label: "Chest", items: ["Upper Chest", "Middle Chest", "Lower Chest"] },
+    { label: "Back", items: ["Lats", "Upper Back", "Lower Back"] },
+    { label: "Shoulders", items: ["Front Delts", "Lateral Delts", "Rear Delts"] },
+    { label: "Arms", items: ["Biceps", "Triceps", "Forearms"] },
+    { label: "Legs", items: ["Quads", "Hamstrings", "Glutes", "Calves"] },
+    { label: "Core", items: ["Abs", "Obliques"] },
+    { label: "Other", items: ["Full Body"] },
+];
 
-    const {
-        days,
-        setDays,
-        presets,
-        loadPresets,
-        createPreset,
-        loading,
-        loadRange,
-        getOrCreateDay,
-        updateDay,
-        addFocus,
-        removeFocus,
-        addExercises,
-        updateExercise,
-        deleteExercise,
-    } = useGymData(userId);
+// Dùng cho dropdown Edit/Create (không cần optgroup)
+const MUSCLES_FLAT: MuscleDetailed[] = MUSCLE_OPTIONS_GROUPED.flatMap((g) => g.items);
 
-    const [unit, setUnit] = useLocalStorage<Unit>(KEY_UNIT, "kg");
-    const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
-    const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
-    const [weekAnchor, setWeekAnchor] = useState<Date>(() => startOfWeek(new Date()));
-    const [showQuickAdd, setShowQuickAdd] = useState(false);
+/* ========= Types & Mocks ========= */
 
-    const selKey = ymdLocal(selectedDate);
-    const today = new Date();
+type WorkoutEntry = {
+    id: string;
+    name: string;
+    muscle: Muscle; // sẽ normalize về MuscleDetailed khi load
+    imageUrl: string;
+    instructions: string; // Guide
+    maxWeight: number; // PR cao nhất (lb)
+    lastPerformed?: string;
+};
 
-    // Load current month range
-    useEffect(() => {
-        if (!userId) return;
-        const first = startOfMonth(viewMonth);
-        const endExclusive = addMonths(first, 1);
-        loadRange(ymdLocal(first), ymdLocal(endExclusive));
-    }, [userId, viewMonth, loadRange]);
+const MOCKS: WorkoutEntry[] = [
+    {
+        id: "w1",
+        name: "Barbell Bench Press",
+        muscle: "Chest",
+        imageUrl: "https://images.unsplash.com/photo-1517963628607-235ccdd5476f?q=80&w=1200&auto=format&fit=crop",
+        instructions:
+            "Lie on the bench, grip slightly wider than shoulder-width, lower the bar to mid-chest, press up while keeping your back tight and feet planted.",
+        maxWeight: 225,
+        lastPerformed: "2025-09-25T10:00:00.000Z",
+    },
+    {
+        id: "w2",
+        name: "Deadlift",
+        muscle: "Back",
+        imageUrl: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200&auto=format&fit=crop",
+        instructions: "Hinge at hips, keep back neutral, brace core, push the floor away. Bar travels close to shins. Lock out with glutes.",
+        maxWeight: 405,
+        lastPerformed: "2025-09-20T07:30:00.000Z",
+    },
+    {
+        id: "w3",
+        name: "Back Squat",
+        muscle: "Legs",
+        imageUrl: "https://images.unsplash.com/photo-1583454110551-21f2fa2f35d7?q=80&w=1200&auto=format&fit=crop",
+        instructions: "Set bar on mid-traps, stance shoulder-width, sit down between hips, keep knees tracking toes, drive up powerfully.",
+        maxWeight: 315,
+        lastPerformed: "2025-08-30T08:00:00.000Z",
+    },
+];
 
-    // Load presets once
-    useEffect(() => {
-        if (!userId) return;
-        loadPresets();
-    }, [userId, loadPresets]);
+/* ========= Helpers ========= */
 
-    const dayLog: DayLogFE = useMemo(
-        () =>
-            days[selKey] ?? {
-                id: "",
-                date: selKey,
-                done: false,
-                focus: [],
-                exercises: [],
-                note: "",
-            },
-        [days, selKey]
-    );
+const fmtWeight = (n: number) => `${n.toLocaleString("en-US")} lb`;
 
-    async function ensureDayId(): Promise<string> {
-        if (dayLog.id) return dayLog.id;
-        const created = await getOrCreateDay(selKey);
-        return created.id;
+// Quy tắc normalize từ legacy -> chi tiết
+function normalizeMuscleByName(entry: WorkoutEntry): MuscleDetailed | "Full Body" {
+    const n = entry.name.toLowerCase();
+    // Ưu tiên rule theo tên bài
+    if (n.includes("incline") && n.includes("press")) return "Upper Chest";
+    if (n.includes("bench") || n.includes("press")) return "Middle Chest";
+    if (n.includes("dip") || n.includes("decline")) return "Lower Chest";
+    if (n.includes("overhead") || n.includes("ohp")) return "Front Delts";
+    if (n.includes("lateral raise")) return "Lateral Delts";
+    if (n.includes("rear delt")) return "Rear Delts";
+    if (n.includes("curl")) return "Biceps";
+    if (n.includes("triceps") || n.includes("skull")) return "Triceps";
+    if (n.includes("deadlift")) return "Lower Back"; // hoặc "Full Body"
+    if (n.includes("squat")) return "Quads";
+    if (n.includes("rdl") || n.includes("romanian")) return "Hamstrings";
+    if (n.includes("calf")) return "Calves";
+    if (n.includes("lat pulldown") || n.includes("pull-down")) return "Lats";
+    if (n.includes("row")) return "Upper Back";
+    if (n.includes("plank") || n.includes("crunch")) return "Abs";
+    if (n.includes("side plank")) return "Obliques";
+
+    // Nếu không match theo tên, map từ legacy muscle rộng
+    switch (entry.muscle) {
+        case "Chest":
+            return "Middle Chest";
+        case "Back":
+            return "Lats";
+        case "Legs":
+            return "Quads";
+        case "Shoulders":
+            return "Lateral Delts";
+        case "Arms":
+            return "Biceps";
+        case "Core":
+            return "Abs";
+        case "Full Body":
+            return "Full Body";
+        default:
+            // Push/Pull hoặc case khác -> để tạm Full Body cho an toàn
+            return "Full Body";
     }
+}
 
-    const getLastWeightKg = (name: string) => {
-        const keys = Object.keys(days).sort((a, b) => (a < b ? 1 : -1));
-        for (const k of keys) {
-            const ex = days[k]?.exercises?.find((e) => e.name.toLowerCase() === name.toLowerCase());
-            if (ex) return ex.weight;
-        }
-        return undefined;
-    };
+/* ========= Component ========= */
 
+export default function WorkoutPageMock() {
+    const [rows, setRows] = useState<WorkoutEntry[]>([]);
+    const [search, setSearch] = useState("");
+    const [muscle, setMuscle] = useState<MuscleDetailed | "All">("All");
+
+    // dialogs
+    const [confirmId, setConfirmId] = useState<string | null>(null);
+    const [editId, setEditId] = useState<string | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
+
+    // edit fields (dùng taxonomy chi tiết)
+    const [editImage, setEditImage] = useState("");
+    const [editMuscle, setEditMuscle] = useState<MuscleDetailed>("Middle Chest");
+    const [editGuide, setEditGuide] = useState("");
+
+    // create fields (dùng taxonomy chi tiết)
+    const [cName, setCName] = useState("");
+    const [cMuscle, setCMuscle] = useState<MuscleDetailed>("Middle Chest");
+    const [cImage, setCImage] = useState("");
+    const [cGuide, setCGuide] = useState("");
+    const [cPR, setCPR] = useState<string>("0");
+
+    // Load + normalize mocks
     useEffect(() => {
-        setWeekAnchor(startOfWeek(selectedDate));
-    }, [selectedDate]);
+        const normalized = MOCKS.map((it) => ({
+            ...it,
+            muscle: normalizeMuscleByName(it), // ép về nhóm chi tiết
+        }));
+        setRows(normalized);
+    }, []);
 
-    const shiftWeek = (deltaDays: number) => {
-        const start = startOfWeek(weekAnchor);
-        const newStart = addDays(start, deltaDays);
-        const offset = selectedDate.getDay();
-        const newSelected = addDays(newStart, offset);
-        setSelectedDate(newSelected);
-    };
-
-    // Add exercise form state
-    const [form, setForm] = useState<Partial<Exercise>>({
-        name: "",
-        sets: 3,
-        reps: 10,
-        weight: 20,
-        note: "",
-    });
-    const nameRef = useRef<HTMLInputElement>(null);
-
-    const applyPresetName = (name: string) => {
-        const lastKg = getLastWeightKg(name);
-        const baseKg = lastKg ?? 20;
-        const shown = unit === "kg" ? baseKg : kgToLb(baseKg);
-        setForm({
-            name,
-            sets: 3,
-            reps: 10,
-            weight: Number(shown.toFixed(1)),
-            note: "",
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return rows.filter((r) => {
+            const nameHit = q ? r.name.toLowerCase().includes(q) : true;
+            const muscleHit = muscle === "All" ? true : r.muscle === muscle;
+            return nameHit && muscleHit;
         });
-        nameRef.current?.focus();
+    }, [rows, search, muscle]);
+
+    // Actions
+    const onDelete = (id: string) => setConfirmId(id);
+    const handleConfirmDelete = () => {
+        if (!confirmId) return;
+        setRows((prev) => prev.filter((r) => r.id !== confirmId));
+        setConfirmId(null);
     };
 
-    const addExerciseFE = async () => {
-        const nm = form.name?.trim();
-        if (!nm) {
-            nameRef.current?.focus();
-            return;
-        }
-        const baseKg = unit === "kg" ? Number(form.weight ?? 0) : lbToKg(Number(form.weight ?? 0));
-        const dayId = await ensureDayId();
-        await addExercises(dayId, [
-            {
-                name: nm,
-                sets: Number(form.sets ?? 3),
-                reps: Number(form.reps ?? 10),
-                weightKg: Number(isNaN(baseKg) ? 0 : Math.max(0, baseKg)),
-                note: form.note?.trim() || "",
-            },
-        ]);
-        await refreshOneDay(dayId, setDays);
-        nameRef.current?.focus();
+    const startEdit = (id: string) => {
+        const it = rows.find((r) => r.id === id);
+        if (!it) return;
+        setEditId(id);
+        setEditImage(it.imageUrl);
+        setEditMuscle(it.muscle as MuscleDetailed); // đã normalize
+        setEditGuide(it.instructions);
+    };
+    const saveEdit = () => {
+        if (!editId) return;
+        setRows((prev) => prev.map((r) => (r.id === editId ? { ...r, imageUrl: editImage.trim(), muscle: editMuscle, instructions: editGuide } : r)));
+        setEditId(null);
     };
 
-    const editExerciseFE = async (exerciseId: string, patch: Partial<Exercise>) => {
-        const payload: any = {};
-        if (patch.name !== undefined) payload.name = patch.name;
-        if (patch.sets !== undefined) payload.sets = patch.sets;
-        if (patch.reps !== undefined) payload.reps = patch.reps;
-        if (patch.weight !== undefined) payload.weightKg = patch.weight; // FE giữ kg
-        if (patch.note !== undefined) payload.note = patch.note;
-        await updateExercise(exerciseId, payload);
-        const dayId = await ensureDayId();
-        await refreshOneDay(dayId, setDays);
+    const openCreateDlg = () => {
+        setCName("");
+        setCMuscle("Middle Chest");
+        setCImage("");
+        setCGuide("");
+        setCPR("0");
+        setCreateOpen(true);
     };
-
-    const removeExerciseFE = async (exerciseId: string) => {
-        await deleteExercise(exerciseId);
-        const dayId = await ensureDayId();
-        await refreshOneDay(dayId, setDays);
+    const saveCreate = () => {
+        if (!cName.trim()) return alert("Name is required");
+        const pr = Number(cPR);
+        if (Number.isNaN(pr) || pr < 0) return alert("PR must be non-negative");
+        const newItem: WorkoutEntry = {
+            id: "w" + Math.random().toString(36).slice(2, 9),
+            name: cName.trim(),
+            muscle: cMuscle, // dùng nhóm chi tiết
+            imageUrl: cImage.trim() || "https://picsum.photos/800/450",
+            instructions: cGuide.trim() || "—",
+            maxWeight: pr,
+            lastPerformed: new Date().toISOString(),
+        };
+        setRows((prev) => [newItem, ...prev]);
+        setCreateOpen(false);
     };
-
-    async function ensureDayIdSynced(): Promise<string> {
-        const id = dayLog.id ? dayLog.id : (await getOrCreateDay(selKey)).id;
-        await refreshOneDay(id, setDays);
-        return id;
-    }
-
-    const toggleFocusFE = async (tagLabel: string) => {
-        const dayId = await ensureDayIdSynced();
-
-        const api = await (await import("../lib/gymApi")).GymApi.getDay(dayId);
-        const current: string[] = (api.focus ?? []).map((f: any) => (typeof f === "string" ? norm(f) : norm(f?.tag)));
-
-        const want = norm(tagLabel);
-        const has = current.includes(want);
-
-        const ymd = selKey;
-        setDays((prev) => {
-            const base = prev[ymd] ?? dayLog;
-            const nextFocus = has ? base.focus.filter((t) => norm(t) !== want) : [...base.focus, tagLabel];
-            return { ...prev, [ymd]: { ...base, focus: nextFocus } };
-        });
-
-        if (has) await removeFocus(dayId, want);
-        else await addFocus(dayId, [want]);
-
-        refreshOneDay(dayId, setDays);
-    };
-
-    const toggleDoneFE = async () => {
-        const dayId = await ensureDayId();
-        await updateDay(dayId, { done: !dayLog.done });
-        await refreshOneDay(dayId, setDays);
-    };
-
-    const monthLabel = useMemo(() => viewMonth.toLocaleString("en-US", { month: "long", year: "numeric" }), [viewMonth]);
-
-    const monthMap = useMemo(() => {
-        const map = new Map<string, DayLogFE>();
-        for (const [rawK, v] of Object.entries(days)) {
-            const k = rawK.length > 10 ? rawK.slice(0, 10) : rawK;
-            const d = parseISO(k);
-            if (d.getFullYear() === viewMonth.getFullYear() && d.getMonth() === viewMonth.getMonth()) {
-                map.set(k, v);
-            }
-        }
-        return map;
-    }, [days, viewMonth]);
-
-    const showWeight = (kg: number) => (unit === "kg" ? kg : kgToLb(kg));
-    const fromInputWeightToKg = (val: number) => (unit === "kg" ? val : lbToKg(val));
-
-    if (!userId) {
-        return <div className="p-6 text-center text-slate-600 dark:text-slate-300">You need to log in to use Gym Log.</div>;
-    }
-
-    // Ensure day details hydrated when switching dates
-    useEffect(() => {
-        (async () => {
-            if (!dayLog?.id) return;
-            if ((dayLog.exercises?.length ?? 0) === 0) {
-                await refreshOneDay(dayLog.id, setDays);
-            }
-        })();
-    }, [selKey, dayLog.id]);
 
     return (
-        <div className="h-full w-full p-4 sm:p-6 text-slate-800 dark:text-slate-100">
+        <div className="h-full w-full bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 transition-colors">
             {/* Header */}
-            <div className="max-w-6xl mx-auto mb-4 sm:mb-6 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-500 text-white shrink-0">
-                        <Dumbbell className="h-5 w-5" />
-                    </div>
-                    <div className="truncate">
-                        <h2 className="text-xl sm:text-2xl font-semibold truncate">Gym Log</h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Theo dõi bài tập & mức tạ • mobile-first</p>
-                    </div>
-                </div>
+            <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                <h2 className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+                    <Dumbbell className="h-6 w-6" />
+                    Workout Personal Records (Mock)
+                </h2>
 
-                <div className="flex items-center gap-2">
-                    {/* Unit */}
-                    <div className="hidden sm:flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm dark:border-slate-700">
-                        <SettingsIcon className="h-4 w-4 text-slate-500" />
-                        <span className="text-slate-500">Unit</span>
-                        <button
-                            onClick={() => setUnit("kg")}
-                            className={`px-2 py-0.5 rounded ${
-                                unit === "kg" ? "bg-emerald-500 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"
-                            }`}
-                        >
-                            kg
-                        </button>
-                        <button
-                            onClick={() => setUnit("lb")}
-                            className={`px-2 py-0.5 rounded ${
-                                unit === "lb" ? "bg-emerald-500 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"
-                            }`}
-                        >
-                            lb
-                        </button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search exercise…"
+                            inputMode="search"
+                            className="rounded-xl border px-4 py-3 pl-9 text-sm outline-none dark:bg-gray-800 dark:border-gray-700 w-full sm:w-[18rem]"
+                        />
                     </div>
+                    <div className="flex gap-2">
+                        {/* Filter theo optgroup */}
+                        <select
+                            value={muscle}
+                            onChange={(e) => setMuscle(e.target.value as MuscleDetailed | "All")}
+                            className="rounded-xl border px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:border-gray-700"
+                        >
+                            <option value="All">All muscles</option>
+                            {MUSCLE_OPTIONS_GROUPED.map((g) => (
+                                <optgroup key={g.label} label={g.label}>
+                                    {g.items.map((m) => (
+                                        <option key={m} value={m}>
+                                            {m}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
 
-                    {/* Month nav (desktop) */}
-                    <div className="hidden sm:flex items-center gap-2">
+                        {/* Create */}
                         <button
-                            onClick={() => setViewMonth((m) => addMonths(m, -1))}
-                            className="rounded-lg border px-2 py-2 text-sm dark:border-slate-700"
-                            title="Prev"
+                            onClick={openCreateDlg}
+                            className="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-white bg-emerald-600 hover:bg-emerald-700"
                         >
-                            <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <div className="rounded-lg border px-3 py-2 text-sm dark:border-slate-700 flex items-center gap-2">
-                            <CalendarIcon className="h-4 w-4 text-slate-500" />
-                            <span>{monthLabel}</span>
-                        </div>
-                        <button
-                            onClick={() => setViewMonth((m) => addMonths(m, 1))}
-                            className="rounded-lg border px-2 py-2 text-sm dark:border-slate-700"
-                            title="Next"
-                        >
-                            <ChevronRight className="h-4 w-4" />
+                            <Plus className="h-4 w-4" /> Create
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Layout */}
-            <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[360px,minmax(0,1fr)] gap-4 sm:gap-6">
-                {/* Month calendar (>= lg) */}
-                <div className="hidden lg:block bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow">
-                    <MonthCalendar viewMonth={viewMonth} selectedDate={selectedDate} onSelect={setSelectedDate} monthMap={monthMap} today={today} />
-                </div>
-
-                {/* Week scroller (mobile) */}
-                <div className="lg:hidden">
-                    <WeekScroller
-                        anchorDate={weekAnchor}
-                        selectedDate={selectedDate}
-                        onSelect={(d) => setSelectedDate(d)}
-                        today={today}
-                        monthMap={days as DaysDB}
-                        onShift={shiftWeek}
-                    />
-                </div>
-
-                {/* Right: day details */}
-                <div className="flex flex-col gap-4 sm:gap-6">
-                    {/* Day + Done + Focus + Unit (mobile unit switch) */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow p-4">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Selected</div>
-                                <div className="text-lg sm:text-xl font-bold">
-                                    {selectedDate.toLocaleDateString("en-US", {
-                                        weekday: "long",
-                                        month: "long",
-                                        day: "numeric",
-                                        year: "numeric",
-                                    })}
+            {/* List */}
+            <div className="max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow border dark:border-gray-700 overflow-hidden">
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-gray-100 dark:divide-gray-700">
+                    {filtered.map((r) => (
+                        <div key={r.id} className="p-4 flex flex-col gap-3">
+                            <div className="aspect-[16/9] w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700">
+                                <img src={r.imageUrl} alt={r.name} className="h-full w-full object-cover" />
+                            </div>
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">{r.muscle}</div>
+                                    <div className="text-base font-semibold">{r.name}</div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{r.instructions}</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">PR</div>
+                                    <div className="text-base font-bold">{fmtWeight(r.maxWeight)}</div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="sm:hidden rounded-lg border px-2.5 py-1.5 text-xs dark:border-slate-700">
-                                    <span className="text-slate-500 mr-1">Unit</span>
-                                    <button
-                                        onClick={() => setUnit(unit === "kg" ? "lb" : "kg")}
-                                        className="px-2 py-0.5 rounded bg-emerald-500 text-white"
-                                    >
-                                        {unit}
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={toggleDoneFE}
-                                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition ${
-                                        dayLog.done
-                                            ? "bg-emerald-500 text-white"
-                                            : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-                                    }`}
-                                    disabled={loading}
-                                >
-                                    <Check className="h-4 w-4" />
-                                    {dayLog.done ? "Đã tập" : "Đánh dấu đã tập"}
-                                </button>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                                <ActionBtn onClick={() => startEdit(r.id)} icon={<Pencil className="h-4 w-4" />} label="Edit" color="amber" />
+                                <ActionBtn onClick={() => onDelete(r.id)} icon={<Trash2 className="h-4 w-4" />} label="Delete" color="rose" />
                             </div>
                         </div>
+                    ))}
+                </div>
 
-                        {/* Focus chips */}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {MUSCLE_PRESETS.map((m) => {
-                                const active = dayLog.focus.some((t) => norm(t) === norm(m));
-                                return (
-                                    <button
-                                        key={m}
-                                        onClick={() => toggleFocusFE(m)}
-                                        className={`chip transition ${active ? "bg-emerald-500 !text-white" : ""}`}
-                                        style={{ padding: ".35rem .65rem" }}
-                                        disabled={loading}
-                                    >
-                                        {m}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Presets */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Plus className="h-4 w-4 text-emerald-500" />
-                            <div className="font-semibold">Presets</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {presets.map((p) => (
-                                <button key={p.id} onClick={() => applyPresetName(p.name)} className="chip hover:opacity-90">
-                                    {p.name}
-                                </button>
-                            ))}
-                            <InlineAddPreset
-                                onAdd={async (name) => {
-                                    const nm = name.trim();
-                                    if (!nm) return;
-                                    await createPreset(nm);
-                                    applyPresetName(nm);
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Add exercise form */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow p-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr,110px,110px,140px] gap-3">
-                            <input
-                                ref={nameRef}
-                                value={form.name ?? ""}
-                                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                                placeholder="Exercise (e.g., Bench Press)"
-                                className="rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                            />
-                            <Stepper label="Sets" value={form.sets ?? 3} onChange={(v) => setForm((f) => ({ ...f, sets: v }))} />
-                            <Stepper label="Reps" value={form.reps ?? 10} onChange={(v) => setForm((f) => ({ ...f, reps: v }))} />
-                            <Stepper
-                                label={`Weight (${unit})`}
-                                value={Number(form.weight ?? 20)}
-                                onChange={(v) => setForm((f) => ({ ...f, weight: v }))}
-                                step={unit === "kg" ? 2.5 : 5}
-                            />
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                            <input
-                                value={form.note ?? ""}
-                                onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-                                placeholder="Note (optional)"
-                                className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:border-slate-700"
-                            />
-                            <button onClick={addExerciseFE} className="btn inline-flex items-center gap-2" disabled={loading}>
-                                <Dumbbell className="h-4 w-4" />
-                                Add
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Exercise table / list */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 shadow overflow-hidden">
-                        <table className="table w-full hidden sm:table">
-                            <thead>
-                                <tr>
-                                    <th>Exercise</th>
-                                    <th>Sets</th>
-                                    <th>Reps</th>
-                                    <th>Weight ({unit})</th>
-                                    <th>Note</th>
-                                    <th className="text-right">Actions</th>
+                {/* Desktop table */}
+                <div className="hidden md:block">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                            <tr>
+                                <th className="px-5 py-3 text-left">Exercise</th>
+                                <th className="px-5 py-3 text-left">Muscle</th>
+                                <th className="px-5 py-3 text-left">Guide</th>
+                                <th className="px-5 py-3 text-right">PR</th>
+                                <th className="px-5 py-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((r) => (
+                                <tr key={r.id} className="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <td className="px-5 py-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-12 w-20 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700 flex-shrink-0">
+                                                <img src={r.imageUrl} alt={r.name} className="h-full w-full object-cover" />
+                                            </div>
+                                            <div className="font-medium">{r.name}</div>
+                                        </div>
+                                    </td>
+                                    <td className="px-5 py-3">{r.muscle}</td>
+                                    <td className="px-5 py-3 max-w-xs">{r.instructions}</td>
+                                    <td className="px-5 py-3 text-right font-semibold">{fmtWeight(r.maxWeight)}</td>
+                                    <td className="px-5 py-3">
+                                        <div className="flex gap-2">
+                                            <ActionBtn
+                                                onClick={() => startEdit(r.id)}
+                                                icon={<Pencil className="h-4 w-4" />}
+                                                label="Edit"
+                                                color="amber"
+                                            />
+                                            <ActionBtn
+                                                onClick={() => onDelete(r.id)}
+                                                icon={<Trash2 className="h-4 w-4" />}
+                                                label="Delete"
+                                                color="rose"
+                                            />
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {dayLog.exercises.length === 0 ? (
-                                    <tr>
-                                        <td className="py-8 text-center text-slate-500 dark:text-slate-400" colSpan={6}>
-                                            No exercises yet
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    dayLog.exercises.map((ex) => (
-                                        <DesktopExerciseRow
-                                            key={ex.id}
-                                            ex={{ ...ex, weight: showWeight(ex.weight) }}
-                                            onEdit={async (patch) => {
-                                                const p: Partial<Exercise> = { ...patch };
-                                                if (p.weight !== undefined) p.weight = fromInputWeightToKg(Number(p.weight));
-                                                await editExerciseFE(ex.id, p);
-                                            }}
-                                            onRemove={() => removeExerciseFE(ex.id)}
-                                        />
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-
-                        {/* Mobile cards */}
-                        <div className="sm:hidden divide-y divide-slate-200 dark:divide-slate-700">
-                            {dayLog.exercises.length === 0 ? (
-                                <div className="py-6 text-center text-slate-500 dark:text-slate-400">No exercises yet</div>
-                            ) : (
-                                dayLog.exercises.map((ex) => (
-                                    <MobileExerciseCard
-                                        key={ex.id}
-                                        ex={{ ...ex, weight: showWeight(ex.weight) }}
-                                        unit={unit}
-                                        onChange={async (patch) => {
-                                            const p: Partial<Exercise> = { ...patch };
-                                            if (p.weight !== undefined) p.weight = fromInputWeightToKg(Number(p.weight));
-                                            await editExerciseFE(ex.id, p);
-                                        }}
-                                        onRemove={() => removeExerciseFE(ex.id)}
-                                    />
-                                ))
+                            ))}
+                            {filtered.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                                        No workouts
+                                    </td>
+                                </tr>
                             )}
-                        </div>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            {/* FAB */}
-            <button
-                onClick={() => setShowQuickAdd((v) => !v)}
-                className="lg:hidden fixed bottom-5 right-5 h-12 w-12 rounded-full shadow-lg text-white bg-emerald-600 flex items-center justify-center"
-                aria-label="Quick add"
-                title="Quick add"
-            >
-                <Plus className="h-5 w-5" />
-            </button>
-
-            {showQuickAdd && (
-                <div className="lg:hidden fixed inset-0 z-50">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setShowQuickAdd(false)} />
-                    <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t dark:border-slate-700 rounded-t-2xl p-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="font-semibold">Quick Add</div>
-                            <button onClick={() => setShowQuickAdd(false)} className="text-slate-500">
-                                Close
+            {/* Edit dialog */}
+            {editId && (
+                <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
+                    <div className="max-w-lg w-full rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow">
+                        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
+                            <div className="font-semibold flex items-center gap-2">
+                                <Pencil className="h-4 w-4" /> Edit workout
+                            </div>
+                            <button onClick={() => setEditId(null)}>
+                                <X className="h-4 w-4" />
                             </button>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            {presets.slice(0, 8).map((p) => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => {
-                                        applyPresetName(p.name);
-                                        setShowQuickAdd(false);
-                                    }}
-                                    className="chip"
-                                >
-                                    {p.name}
+                        <div className="p-4 space-y-4">
+                            <label className="text-xs text-gray-500 dark:text-gray-400">Image URL</label>
+                            <input value={editImage} onChange={(e) => setEditImage(e.target.value)} className="w-full border rounded p-2" />
+                            <label className="text-xs text-gray-500 dark:text-gray-400">Muscle</label>
+                            <select
+                                value={editMuscle}
+                                onChange={(e) => setEditMuscle(e.target.value as MuscleDetailed)}
+                                className="w-full border rounded p-2"
+                            >
+                                {MUSCLES_FLAT.map((m) => (
+                                    <option key={m} value={m}>
+                                        {m}
+                                    </option>
+                                ))}
+                            </select>
+                            <label className="text-xs text-gray-500 dark:text-gray-400">Guide</label>
+                            <textarea
+                                value={editGuide}
+                                onChange={(e) => setEditGuide(e.target.value)}
+                                className="w-full border rounded p-2"
+                                rows={4}
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => setEditId(null)} className="px-4 py-2 bg-gray-100 rounded">
+                                    Cancel
                                 </button>
-                            ))}
+                                <button onClick={saveEdit} className="px-4 py-2 bg-emerald-600 text-white rounded">
+                                    Save
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Create dialog */}
+            {createOpen && (
+                <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center p-4">
+                    <div className="max-w-lg w-full rounded-xl bg-white dark:bg-gray-800 border dark:border-gray-700 shadow">
+                        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
+                            <div className="font-semibold flex items-center gap-2">
+                                <Plus className="h-4 w-4" /> Create workout
+                            </div>
+                            <button onClick={() => setCreateOpen(false)}>
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            <input
+                                value={cName}
+                                onChange={(e) => setCName(e.target.value)}
+                                placeholder="Name"
+                                className="w-full border rounded p-2"
+                            />
+                            <select
+                                value={cMuscle}
+                                onChange={(e) => setCMuscle(e.target.value as MuscleDetailed)}
+                                className="w-full border rounded p-2"
+                            >
+                                {MUSCLES_FLAT.map((m) => (
+                                    <option key={m} value={m}>
+                                        {m}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                value={cImage}
+                                onChange={(e) => setCImage(e.target.value)}
+                                placeholder="Image URL"
+                                className="w-full border rounded p-2"
+                            />
+                            <textarea
+                                value={cGuide}
+                                onChange={(e) => setCGuide(e.target.value)}
+                                placeholder="Guide"
+                                className="w-full border rounded p-2"
+                            />
+                            <input value={cPR} onChange={(e) => setCPR(e.target.value)} placeholder="PR (lb)" className="w-full border rounded p-2" />
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-gray-100 rounded">
+                                    Cancel
+                                </button>
+                                <button onClick={saveCreate} className="px-4 py-2 bg-emerald-600 text-white rounded">
+                                    Create
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ConfirmDialog
+                open={!!confirmId}
+                title="Delete workout"
+                message="Are you sure you want to delete this workout?"
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setConfirmId(null)}
+            />
         </div>
+    );
+}
+
+/* ========= Small UI ========= */
+function ActionBtn({ onClick, icon, label, color }: { onClick: () => void; icon: React.ReactNode; label: string; color: "amber" | "rose" }) {
+    const base = { amber: "bg-amber-500 hover:bg-amber-600", rose: "bg-rose-500 hover:bg-rose-600" }[color];
+    return (
+        <button onClick={onClick} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-white ${base}`}>
+            {icon}
+            <span>{label}</span>
+        </button>
     );
 }

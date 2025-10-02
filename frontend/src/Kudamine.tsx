@@ -12,7 +12,7 @@ import PlaylistPage from "./pages/PlaylistPage";
 import SettingsPage from "./pages/SettingsPage";
 import { SpendingPage } from "./pages/SpendingPage";
 import TestPage from "./pages/Test";
-import RetroCRT from "./pages/Test2";
+import WorkoutPageMock from "./pages/Test2";
 import RequireAuth from "./routes/RequireAuth";
 import { useAuthStore } from "./stores/auth";
 
@@ -21,7 +21,7 @@ export default function Kudamine() {
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const isAuthed = useAuthStore((s) => Boolean(s.token || s.user?.id));
 
-    const BLANK_ROUTES = new Set<string>(["/login", "/test", "/test2"]);
+    const BLANK_ROUTES = new Set<string>(["/login", "/test"]);
 
     // Nếu đang ở /login mà đã đăng nhập -> đá về /spending
     if (location.pathname === "/login" && isAuthed) {
@@ -35,7 +35,7 @@ export default function Kudamine() {
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/test" element={<TestPage />} />
-                    <Route path="/test2" element={<RetroCRT />} />
+                    {/* <Route path="/test2" element={<WorkoutPageMock />} /> */}
                 </Routes>
             </div>
         );
@@ -88,6 +88,14 @@ export default function Kudamine() {
                             element={
                                 <RequireAuth>
                                     <SettingsPage />
+                                </RequireAuth>
+                            }
+                        />
+                        <Route
+                            path="/test2"
+                            element={
+                                <RequireAuth>
+                                    <WorkoutPageMock />
                                 </RequireAuth>
                             }
                         />

@@ -2,6 +2,7 @@ import { LogOut, Moon, Plus, Sun, User as UserIcon, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import RollingOneChar from "../components/RollingOneChar";
+import { useAuthStore } from "../stores/auth";
 import { IconArrows, IconCard, IconChart, IconCog, IconGift, IconGrid, IconLifeRing, IconList, IconShield, IconTrend, Logo } from "./common/Icons";
 
 type CurrentUser = {
@@ -45,6 +46,7 @@ type SidebarProps = {
 };
 
 export function Sidebar({ mobileOpen = false, onCloseMobile, currentUser, onSignOut, onToggleTheme, isDark }: SidebarProps) {
+    const user = useAuthStore((s) => s.user);
     // ===== Swipe to close (mobile) =====
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [dragX, setDragX] = useState(0);
@@ -83,7 +85,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile, currentUser, onSign
                 <Avatar src={currentUser?.photoURL} size={42} />
                 <div className="min-w-0">
                     <div className="text-sm text-slate-500">Xin chào</div>
-                    <div className="font-semibold truncate">{currentUser?.displayName || currentUser?.email || "Guest"}</div>
+                    <div className="font-semibold truncate">{user?.name || "Guest"}</div>
                 </div>
 
                 <button

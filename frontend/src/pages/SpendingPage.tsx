@@ -261,7 +261,37 @@ export function SpendingPage() {
                                             <StatusPill status={r.status} />
                                         </td>
                                         <td className="px-5 py-3">
-                                            <div className="flex gap-2">{/* giữ như cũ */}</div>
+                                            <div className="flex gap-2">
+                                                <div className="flex flex-wrap gap-2 pt-1">
+                                                    <ActionBtn
+                                                        active={r.status === "Done"}
+                                                        onClick={() => setStatus(r.id, "Done")}
+                                                        icon={<Check className="h-4 w-4" />}
+                                                        label="Done"
+                                                        color="emerald"
+                                                    />
+                                                    <ActionBtn
+                                                        active={r.status === "Process"}
+                                                        onClick={() => setStatus(r.id, "Process")}
+                                                        icon={<Loader2 className="h-4 w-4" />}
+                                                        label="Process"
+                                                        color="amber"
+                                                    />
+                                                    <ActionBtn
+                                                        active={r.status === "Skip"}
+                                                        onClick={() => setStatus(r.id, "Skip")}
+                                                        icon={<X className="h-4 w-4" />}
+                                                        label="Skip"
+                                                        color="rose"
+                                                    />
+                                                    <ActionBtn
+                                                        onClick={() => onDelete(r.id)}
+                                                        icon={<Trash2 className="h-4 w-4" />}
+                                                        label="Delete"
+                                                        color="rose"
+                                                    />
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
