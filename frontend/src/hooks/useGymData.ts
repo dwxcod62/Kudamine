@@ -30,15 +30,16 @@ function toFE(d: GymDay): DayLogFE {
         id: d.id,
         date: toYMD(d.dateYmd),
         done: d.done,
-        note: d.note,
+        note: d.note ?? null,
         focus: (d.focus ?? []).map((f) => f.tag).filter(Boolean),
         exercises: Array.isArray(d.exercises)
             ? d.exercises.map((e) => ({
                   id: e.id,
-                  name: e.name,
+                  // NAME: prefer preset.name (backend include), fallback to legacy e.name
+                  name: (e.preset && e.preset.name) || e.name || "Unknown",
                   sets: e.sets,
                   reps: e.reps,
-                  weight: e.weightKg, // FE giữ kg
+                  weight: e.weightKg,
                   note: e.note,
               }))
             : [],
@@ -131,7 +132,7 @@ export function useGymData(userId: string) {
         if (inflight.current.has(dayId)) return; // tránh gọi trùng
         inflight.current.add(dayId);
         try {
-            const d = await GymApi.getDay(dayId); // BE include exercises
+            const d = await GymApi.getDay(dayId); // BE include exercises + preset
             const fe = toFE(d);
             setDays((prev) => ({ ...prev, [fe.date]: { ...(prev[fe.date] ?? ({} as any)), ...fe } }));
             return fe;
@@ -199,8 +200,9 @@ export function useGymData(userId: string) {
     );
 
     /** ========== EXERCISES ========== */
+    // items: accept { presetId?: string; name?: string; sets, reps, weightKg, note? }
     const addExercises = useCallback(
-        async (dayId: string, items: { name: string; sets: number; reps: number; weightKg: number; note?: string }[]) => {
+        async (dayId: string, items: { presetId?: string; name?: string; sets: number; reps: number; weightKg: number; note?: string }[]) => {
             await GymApi.addExercises(dayId, items);
             await refreshOneDay(dayId);
         },
@@ -208,7 +210,7 @@ export function useGymData(userId: string) {
     );
 
     const updateExercise = useCallback(
-        async (exerciseId: string, patch: { name?: string; sets?: number; reps?: number; weightKg?: number; note?: string }) => {
+        async (exerciseId: string, patch: { presetId?: string; name?: string; sets?: number; reps?: number; weightKg?: number; note?: string }) => {
             await GymApi.updateExercise(exerciseId, patch);
             // tìm dayId từ cache rồi refresh lại ngày đó
             const entry = Object.values(days).find((d) => d.exercises.some((e) => e.id === exerciseId));

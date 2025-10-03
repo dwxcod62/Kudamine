@@ -53,7 +53,12 @@ r.get("/days", async (req, res) => {
     const days = await prisma.gymDay.findMany({
         where,
         orderBy: [{ dateYmd: "asc" }],
-        include: { focus: true, exercises: true },
+        include: {
+            focus: true,
+            exercises: {
+                include: { preset: true },
+            },
+        },
     });
     res.json(days);
 });
@@ -119,7 +124,7 @@ r.post("/days", async (req, res) => {
 r.get("/days/:id", async (req, res) => {
     const day = await prisma.gymDay.findUnique({
         where: { id: req.params.id },
-        include: { focus: true, exercises: true },
+        include: { focus: true, exercises: { include: { preset: true } } },
     });
     if (!day) return res.status(404).json({ message: "Not found" });
     res.json(day);
@@ -302,26 +307,62 @@ r.delete("/days/:id/focus/:tag", async (req, res) => {
 
 r.post("/days/:id/exercises", async (req, res) => {
     const { items } = req.body as {
-        items: { name: string; sets: number; reps: number; weightKg: number; note?: string }[];
+        items: { presetId?: string; name?: string; sets: number; reps: number; weightKg: number; note?: string }[];
     };
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "items[] required" });
     const dayId = req.params.id;
 
-    const created = await prisma.$transaction(
-        items.map((x) =>
-            prisma.gymExercise.create({
-                data: {
+    try {
+        const prepared = await Promise.all(
+            items.map(async (x) => {
+                if (!Number.isInteger(x.sets) || !Number.isInteger(x.reps) || typeof x.weightKg !== "number") {
+                    throw { status: 400, message: "invalid item: sets,reps,weightKg required" };
+                }
+
+                let presetId = x.presetId;
+                if (!presetId) {
+                    if (!x.name) throw { status: 400, message: "each item must provide presetId or name" };
+                    const preset = await prisma.gymPreset.findUnique({ where: { name: x.name } });
+                    if (!preset) throw { status: 400, message: `preset not found: ${x.name}` };
+                    presetId = preset.id;
+                } else {
+                    const exists = await prisma.gymPreset.findUnique({ where: { id: presetId }, select: { id: true } });
+                    if (!exists) throw { status: 400, message: `presetId not found: ${presetId}` };
+                }
+
+                return {
                     dayId,
-                    name: x.name,
+                    presetId,
                     sets: x.sets,
                     reps: x.reps,
                     weightKg: x.weightKg as any,
                     note: x.note,
-                },
+                };
             })
-        )
-    );
-    res.status(201).json(created);
+        );
+
+        const created = await prisma.$transaction(
+            prepared.map((data) =>
+                prisma.gymExercise.create({
+                    data,
+                })
+            )
+        );
+
+        const createdWithPreset = await Promise.all(
+            created.map((c) =>
+                prisma.gymExercise.findUnique({
+                    where: { id: c.id },
+                    include: { preset: true },
+                })
+            )
+        );
+
+        res.status(201).json(createdWithPreset);
+    } catch (e: any) {
+        if (e?.status) return res.status(e.status).json({ message: e.message });
+        res.status(400).json({ message: e?.message ?? "Create failed" });
+    }
 });
 
 /**
@@ -352,15 +393,42 @@ r.post("/days/:id/exercises", async (req, res) => {
  *       404: { description: Not found }
  */
 r.patch("/exercises/:id", async (req, res) => {
-    const { name, sets, reps, weightKg, note } = req.body;
+    const { presetId, name, sets, reps, weightKg, note } = req.body as {
+        presetId?: string;
+        name?: string;
+        sets?: number;
+        reps?: number;
+        weightKg?: number;
+        note?: string;
+    };
+
+    const data: any = { updatedAt: new Date() };
+
     try {
+        if (presetId) {
+            const p = await prisma.gymPreset.findUnique({ where: { id: presetId }, select: { id: true } });
+            if (!p) return res.status(400).json({ message: "presetId not found" });
+            data.presetId = presetId;
+        } else if (name) {
+            const p = await prisma.gymPreset.findUnique({ where: { name } });
+            if (!p) return res.status(400).json({ message: "preset name not found" });
+            data.presetId = p.id;
+        }
+
+        if (Number.isInteger(sets)) data.sets = sets;
+        if (Number.isInteger(reps)) data.reps = reps;
+        if (weightKg !== undefined) data.weightKg = weightKg as any;
+        if (note !== undefined) data.note = note;
+
         const updated = await prisma.gymExercise.update({
             where: { id: req.params.id },
-            data: { name, sets, reps, weightKg: weightKg as any, note },
+            data,
+            include: { preset: true },
         });
         res.json(updated);
-    } catch {
-        res.status(404).json({ message: "Not found" });
+    } catch (e: any) {
+        if (e?.code === "P2025") return res.status(404).json({ message: "Not found" });
+        res.status(400).json({ message: e?.message ?? "Update failed" });
     }
 });
 

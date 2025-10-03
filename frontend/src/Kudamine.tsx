@@ -21,7 +21,7 @@ export default function Kudamine() {
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const isAuthed = useAuthStore((s) => Boolean(s.token || s.user?.id));
 
-    const BLANK_ROUTES = new Set<string>(["/login", "/test"]);
+    const BLANK_ROUTES = new Set<string>(["/login", "/test", "/test2"]);
 
     // Nếu đang ở /login mà đã đăng nhập -> đá về /spending
     if (location.pathname === "/login" && isAuthed) {
@@ -35,7 +35,7 @@ export default function Kudamine() {
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/test" element={<TestPage />} />
-                    {/* <Route path="/test2" element={<WorkoutPageMock />} /> */}
+                    <Route path="/test2" element={<WorkoutPageMock />} />
                 </Routes>
             </div>
         );
@@ -91,14 +91,14 @@ export default function Kudamine() {
                                 </RequireAuth>
                             }
                         />
-                        <Route
+                        {/* <Route
                             path="/test2"
                             element={
                                 <RequireAuth>
                                     <WorkoutPageMock />
                                 </RequireAuth>
                             }
-                        />
+                        /> */}
                         <Route path="*" element={<Navigate to="/spending" replace />} />
                     </Routes>
                 </div>

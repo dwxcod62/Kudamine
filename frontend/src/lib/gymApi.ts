@@ -3,26 +3,6 @@ import type { MuscleToken } from "../utils/muscles";
 
 /* ========= Types ========= */
 
-export type GymDay = {
-    id: string;
-    userId: string;
-    dateYmd: string; // ISO
-    note: string | null;
-    done: boolean;
-    createdAt: string;
-    updatedAt: string;
-    focus: { dayId: string; tag: string }[];
-    exercises: {
-        id: string;
-        dayId: string;
-        name: string;
-        sets: number;
-        reps: number;
-        weightKg: number;
-        note: string | null;
-    }[];
-};
-
 export type GymPresetTarget = {
     id: string;
     presetId: string;
@@ -36,6 +16,31 @@ export type GymPreset = {
     imageUrl?: string;
     instructions: string;
     targets: GymPresetTarget[];
+};
+
+export type GymDay = {
+    id: string;
+    userId: string;
+    dateYmd: string; // ISO
+    note: string | null;
+    done: boolean;
+    createdAt: string;
+    updatedAt: string;
+    focus: { dayId: string; tag: string }[];
+    exercises: {
+        id: string;
+        dayId: string;
+        // backend giờ trả presetId + include preset (optional)
+        presetId: string;
+        // BE include: preset: GymPreset | null
+        preset?: GymPreset | null;
+        // kept for backward compat if any old rows still had name
+        name?: string | null;
+        sets: number;
+        reps: number;
+        weightKg: number;
+        note: string | null;
+    }[];
 };
 
 export type CreatePresetPayload = {
@@ -149,13 +154,15 @@ export const GymApi = {
 
     /** ============ Exercises ============ */
 
-    addExercises: (dayId: string, items: { name: string; sets: number; reps: number; weightKg: number; note?: string }[]) =>
+    // NOTE: items now accept either presetId OR name (back-compat). Server will resolve name -> presetId.
+    addExercises: (dayId: string, items: { presetId?: string; name?: string; sets: number; reps: number; weightKg: number; note?: string }[]) =>
         http<any>(`${BASE}/days/${dayId}/exercises`, {
             method: "POST",
             body: JSON.stringify({ items }),
         }),
 
-    updateExercise: (id: string, patch: { name?: string; sets?: number; reps?: number; weightKg?: number; note?: string }) =>
+    // update can accept presetId or name
+    updateExercise: (id: string, patch: { presetId?: string; name?: string; sets?: number; reps?: number; weightKg?: number; note?: string }) =>
         http<any>(`${BASE}/exercises/${id}`, {
             method: "PATCH",
             body: JSON.stringify(patch),

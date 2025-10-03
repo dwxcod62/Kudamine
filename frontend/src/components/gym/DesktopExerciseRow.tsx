@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 export type Exercise = {
     id: string;
     name: string;
+    presetId?: string;
     sets: number;
     reps: number;
     weight: number;

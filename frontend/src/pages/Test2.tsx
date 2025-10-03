@@ -35,26 +35,6 @@ export default function WorkoutPresetsPage() {
     const [cImage, setCImage] = useState("");
     const [cGuide, setCGuide] = useState("");
 
-    /* ===== Load presets ===== */
-    useEffect(() => {
-        let alive = true;
-        (async () => {
-            try {
-                setError(null);
-                const presets = await GymApi.listPresets(); // ← không userId
-                if (!alive) return;
-                setRows(presets);
-            } catch (e: any) {
-                if (!alive) return;
-                setError(e?.message ?? "Load failed");
-            }
-        })();
-        return () => {
-            alive = false;
-        };
-    }, []);
-
-    /* ===== Refetch when filter by muscle (server-side) ===== */
     useEffect(() => {
         let alive = true;
         (async () => {
@@ -71,6 +51,9 @@ export default function WorkoutPresetsPage() {
                 if (alive) setLoading(false);
             }
         })();
+        return () => {
+            alive = false;
+        };
     }, [muscle]);
 
     const filtered = useMemo(() => {

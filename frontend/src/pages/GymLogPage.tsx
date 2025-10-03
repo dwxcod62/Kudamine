@@ -93,7 +93,7 @@ export default function GymLogPage() {
     const getLastWeightKg = (name: string) => {
         const keys = Object.keys(days).sort((a, b) => (a < b ? 1 : -1));
         for (const k of keys) {
-            const ex = days[k]?.exercises?.find((e) => e.name.toLowerCase() === name.toLowerCase());
+            const ex = days[k]?.exercises?.find((e) => (e.name ?? "").toLowerCase() === name.toLowerCase());
             if (ex) return ex.weight;
         }
         return undefined;
@@ -114,6 +114,7 @@ export default function GymLogPage() {
     // Add exercise form state
     const [form, setForm] = useState<Partial<Exercise>>({
         name: "",
+        presetId: undefined,
         sets: 3,
         reps: 10,
         weight: 20,
@@ -121,12 +122,13 @@ export default function GymLogPage() {
     });
     const nameRef = useRef<HTMLInputElement>(null);
 
-    const applyPresetName = (name: string) => {
-        const lastKg = getLastWeightKg(name);
+    const applyPreset = (preset: { id: string; name: string }) => {
+        const lastKg = getLastWeightKg(preset.name);
         const baseKg = lastKg ?? 20;
         const shown = unit === "kg" ? baseKg : kgToLb(baseKg);
         setForm({
-            name,
+            name: preset.name,
+            presetId: preset.id,
             sets: 3,
             reps: 10,
             weight: Number(shown.toFixed(1)),
@@ -136,23 +138,27 @@ export default function GymLogPage() {
     };
 
     const addExerciseFE = async () => {
-        const nm = form.name?.trim();
+        const nm = (form.name ?? "").trim();
         if (!nm) {
             nameRef.current?.focus();
             return;
         }
         const baseKg = unit === "kg" ? Number(form.weight ?? 0) : lbToKg(Number(form.weight ?? 0));
         const dayId = await ensureDayId();
-        await addExercises(dayId, [
-            {
-                name: nm,
-                sets: Number(form.sets ?? 3),
-                reps: Number(form.reps ?? 10),
-                weightKg: Number(isNaN(baseKg) ? 0 : Math.max(0, baseKg)),
-                note: form.note?.trim() || "",
-            },
-        ]);
+
+        const item: any = {
+            sets: Number(form.sets ?? 3),
+            reps: Number(form.reps ?? 10),
+            weightKg: Number(isNaN(baseKg) ? 0 : Math.max(0, baseKg)),
+            note: (form.note ?? "").trim(),
+        };
+
+        if (form.presetId) item.presetId = form.presetId;
+        else item.name = nm;
+
+        await addExercises(dayId, [item]);
         await refreshOneDay(dayId, setDays);
+        setForm((f) => ({ ...f, name: "", presetId: undefined }));
         nameRef.current?.focus();
     };
 
@@ -387,7 +393,7 @@ export default function GymLogPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {presets.map((p) => (
-                                <button key={p.id} onClick={() => applyPresetName(p.name)} className="chip hover:opacity-90">
+                                <button key={p.id} onClick={() => applyPreset(p)} className="chip hover:opacity-90">
                                     {p.name}
                                 </button>
                             ))}
@@ -395,8 +401,8 @@ export default function GymLogPage() {
                                 onAdd={async (name) => {
                                     const nm = name.trim();
                                     if (!nm) return;
-                                    await createPreset(nm);
-                                    applyPresetName(nm);
+                                    const p = await createPreset(nm);
+                                    if (p) applyPreset(p);
                                 }}
                             />
                         </div>
@@ -522,7 +528,7 @@ export default function GymLogPage() {
                                 <button
                                     key={p.id}
                                     onClick={() => {
-                                        applyPresetName(p.name);
+                                        applyPreset(p);
                                         setShowQuickAdd(false);
                                     }}
                                     className="chip"

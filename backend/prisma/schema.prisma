@@ -69,15 +69,17 @@ model GymDayFocus {
 model GymExercise {
   id        String   @id @default(uuid())
   dayId     String
-  name      String
+  presetId  String
   sets      Int
   reps      Int
   weightKg  Decimal  @db.Decimal(6, 1)
   note      String?
   createdAt DateTime @default(now())
   day       GymDay   @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  preset     GymPreset @relation(fields: [presetId], references: [id], onDelete: Restrict)
 
   @@index([dayId])
+  @@index([presetId])
 }
 
 // ====== MuscleDetailed thay cho Muscle ======
@@ -113,16 +115,17 @@ model GymPresetTarget {
   @@index([detail])
 }
 
-  model GymPreset {
-    id           String  @id @default(uuid())
-    name         String
-    imageUrl     String?
-    instructions String?
+model GymPreset {
+  id           String  @id @default(uuid())
+  name         String
+  imageUrl     String?
+  instructions String?
 
-    targets GymPresetTarget[]
+  targets GymPresetTarget[]
+  exercises    GymExercise[]
 
-    @@unique([name])
-  }
+  @@unique([name])
+}
 
 model Playlist {
   id        String   @id @default(uuid())
