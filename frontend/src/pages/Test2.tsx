@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { Dumbbell, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -35,6 +36,30 @@ export default function WorkoutPresetsPage() {
     const [cImage, setCImage] = useState("");
     const [cGuide, setCGuide] = useState("");
 
+    /* ===== Image Zoom (Lightbox) ===== */
+    const [zoomOpen, setZoomOpen] = useState(false);
+    const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+    const [zoomName, setZoomName] = useState<string>("");
+    const [zoom, setZoom] = useState(1);
+
+    /** meta để hiển thị bên cạnh ảnh */
+    const [zoomMuscle, setZoomMuscle] = useState<string>("");
+    const [zoomGuide, setZoomGuide] = useState<string>("");
+
+    const openZoom = (src: string, name: string, muscleLabel?: string, guideText?: string) => {
+        setZoomSrc(src || EMPTY_IMG);
+        setZoomName(name);
+        setZoomMuscle(muscleLabel ?? "");
+        setZoomGuide(guideText ?? "");
+        setZoom(1);
+        setZoomOpen(true);
+    };
+
+    const closeZoom = () => setZoomOpen(false);
+    const zoomIn = () => setZoom((z) => Math.min(4, Number((z + 0.25).toFixed(2))));
+    const zoomOut = () => setZoom((z) => Math.max(0.25, Number((z - 0.25).toFixed(2))));
+    const resetZoom = () => setZoom(1);
+
     useEffect(() => {
         let alive = true;
         (async () => {
@@ -55,6 +80,27 @@ export default function WorkoutPresetsPage() {
             alive = false;
         };
     }, [muscle]);
+
+    useEffect(() => {
+        if (!zoomOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") closeZoom();
+            if (e.key === "+" || e.key === "=") {
+                e.preventDefault();
+                zoomIn();
+            }
+            if (e.key === "-") {
+                e.preventDefault();
+                zoomOut();
+            }
+            if (e.key.toLowerCase() === "r") {
+                e.preventDefault();
+                resetZoom();
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [zoomOpen]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -83,26 +129,20 @@ export default function WorkoutPresetsPage() {
         setEditName(it.name);
         setEditImage(it.imageUrl || "");
         setEditGuide(it.instructions || "");
-
-        // nếu preset có nhiều targets, tạm chọn target đầu tiên
         const firstDetailRaw = it.targets[0]?.detail ?? "MiddleChest";
-        setEditMuscle(toToken(firstDetailRaw) ?? "MiddleChest"); // map về token
+        setEditMuscle(toToken(firstDetailRaw) ?? "MiddleChest");
     };
 
     const saveEdit = async () => {
         if (!editId) return;
         try {
-            // 1) update meta
             await GymApi.updatePresetMeta(editId, {
                 name: editName.trim(),
                 imageUrl: editImage.trim(),
                 instructions: editGuide.trim(),
             });
-
-            // 2) đồng bộ targets: giữ 1 token (editMuscle)
             const current = await GymApi.getPreset(editId);
             const currentTokens = current.targets.map((t) => toToken(t.detail)).filter(Boolean) as MuscleToken[];
-
             const toRemove = currentTokens.filter((t) => t !== editMuscle);
             const needAdd = currentTokens.includes(editMuscle) ? [] : [editMuscle];
 
@@ -111,7 +151,6 @@ export default function WorkoutPresetsPage() {
                 ...(needAdd.length ? [GymApi.addPresetTargets(editId, needAdd)] : []),
             ]);
 
-            // 3) refresh local
             const refreshed = await GymApi.getPreset(editId);
             setRows((prev) => prev.map((r) => (r.id === editId ? refreshed : r)));
             setEditId(null);
@@ -190,7 +229,7 @@ export default function WorkoutPresetsPage() {
             </div>
 
             {/* List */}
-            <div className="max-w-6xl mx-auto  rounded-xl  overflow-hidden">
+            <div className="max-w-6xl mx-auto rounded-xl overflow-hidden">
                 {error && <div className="p-4 text-rose-600 text-sm">{error}</div>}
                 {loading && <div className="p-4 text-sm text-gray-500">Loading…</div>}
 
@@ -201,9 +240,21 @@ export default function WorkoutPresetsPage() {
                             key={r.id}
                             className="p-4 flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm bg-white dark:bg-gray-800"
                         >
-                            <div className="aspect-[16/9] w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    openZoom(
+                                        r.imageUrl || EMPTY_IMG,
+                                        r.name,
+                                        r.targets[0]?.detail ? toLabel(r.targets[0].detail) : "—",
+                                        r.instructions || ""
+                                    )
+                                }
+                                className="aspect-[16/9] w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-zoom-in"
+                                title="Click to zoom"
+                            >
                                 <img src={r.imageUrl || EMPTY_IMG} alt={r.name} className="h-full w-full object-cover" />
-                            </div>
+                            </button>
 
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -241,9 +292,21 @@ export default function WorkoutPresetsPage() {
                                 <tr key={r.id} className="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                     <td className="px-5 py-3">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-12 w-20 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700 flex-shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    openZoom(
+                                                        r.imageUrl || EMPTY_IMG,
+                                                        r.name,
+                                                        r.targets[0]?.detail ? toLabel(r.targets[0].detail) : "—",
+                                                        r.instructions || ""
+                                                    )
+                                                }
+                                                className="h-12 w-20 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-700 flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-zoom-in"
+                                                title="Click to zoom"
+                                            >
                                                 <img src={r.imageUrl || EMPTY_IMG} alt={r.name} className="h-full w-full object-cover" />
-                                            </div>
+                                            </button>
                                             <div className="font-medium">{r.name}</div>
                                         </div>
                                     </td>
@@ -382,6 +445,152 @@ export default function WorkoutPresetsPage() {
                 </div>
             )}
 
+            {/* Image Lightbox (Animated) */}
+            <AnimatePresence>
+                {zoomOpen && (
+                    <motion.div
+                        key="lb-backdrop"
+                        className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
+                        initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                        animate={{ opacity: 1, backdropFilter: "blur(4px)" }}
+                        exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                        transition={{ duration: 0.18 }}
+                        onClick={closeZoom}
+                        aria-modal
+                        role="dialog"
+                    >
+                        {/* Toolbar */}
+                        <motion.div
+                            key="lb-toolbar"
+                            className="absolute left-1/2 -translate-x-1/2 top-4 flex items-center gap-2 rounded-full bg-white/90 dark:bg-gray-800/90 border dark:border-gray-700 shadow px-3 py-2"
+                            initial={{ y: -20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -20, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <span className="text-sm font-medium max-w-[40vw] truncate">{zoomName}</span>
+                            <span className="mx-2 h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                            <button onClick={zoomOut} className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                                –
+                            </button>
+                            <div className="min-w-[3.5rem] text-center text-sm tabular-nums">{Math.round(zoom * 100)}%</div>
+                            <button onClick={zoomIn} className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                                +
+                            </button>
+                            <button onClick={resetZoom} className="ml-1 px-2 py-1 rounded bg-emerald-600 text-white text-xs hover:bg-emerald-700">
+                                Reset
+                            </button>
+                            <button onClick={closeZoom} className="ml-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </motion.div>
+
+                        {/* Stage */}
+                        <motion.div
+                            key="lb-stage"
+                            className="absolute inset-0 mt-16 mb-6 overflow-hidden"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.12 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="h-full w-full overflow-auto">
+                                <div className="min-h-full w-full grid place-items-center p-4">
+                                    {/* inline container: image + info cards */}
+                                    <div className="inline-flex flex-col lg:flex-row items-start gap-3 lg:gap-4">
+                                        {/* Image area */}
+                                        <motion.div
+                                            key="lb-image-wrap"
+                                            drag
+                                            dragMomentum
+                                            dragElastic={0.2}
+                                            style={{ cursor: zoom > 1 ? "grab" : "default", touchAction: "none" }}
+                                            onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+                                                const step = e.ctrlKey || e.metaKey ? 0.25 : 0.1;
+                                                if (e.deltaY > 0) setZoom((z) => Math.max(0.25, Number((z - step).toFixed(2))));
+                                                else setZoom((z) => Math.min(4, Number((z + step).toFixed(2))));
+                                            }}
+                                            onDoubleClick={() => setZoom((z) => (z === 1 ? 2 : 1))}
+                                            transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                                            initial={{ scale: 0.98, opacity: 0.9 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            exit={{ scale: 0.98, opacity: 0 }}
+                                            className="rounded-xl overflow-hidden"
+                                        >
+                                            {/* desktop: chừa chỗ cho sidebar */}
+                                            <motion.img
+                                                key={(zoomSrc || "") + "-lg"}
+                                                src={zoomSrc || EMPTY_IMG}
+                                                alt={zoomName}
+                                                draggable={false}
+                                                className="hidden lg:block select-none rounded-xl shadow-2xl"
+                                                style={{
+                                                    transform: `scale(${zoom})`,
+                                                    transformOrigin: "center center",
+                                                    // chừa ~360px sidebar + 16px gap
+                                                    maxWidth: "calc(92vw - 376px)",
+                                                    maxHeight: "min(78vh, 1200px)",
+                                                    transition: "transform 120ms ease",
+                                                }}
+                                            />
+                                            {/* mobile/tablet: sidebar nằm dưới nên không trừ width */}
+                                            <motion.img
+                                                key={(zoomSrc || "") + "-sm"}
+                                                src={zoomSrc || EMPTY_IMG}
+                                                alt={zoomName}
+                                                draggable={false}
+                                                className="lg:hidden select-none rounded-xl shadow-2xl"
+                                                style={{
+                                                    transform: `scale(${zoom})`,
+                                                    transformOrigin: "center center",
+                                                    maxWidth: "min(92vw, 1600px)",
+                                                    maxHeight: "min(78vh, 1200px)",
+                                                    transition: "transform 120ms ease",
+                                                }}
+                                            />
+                                        </motion.div>
+
+                                        {/* Info cards (right of image on lg, below on small) */}
+                                        <motion.div
+                                            className="w-full lg:w-[340px] shrink-0 space-y-2"
+                                            initial={{ x: 20, opacity: 0 }}
+                                            animate={{ x: 0, opacity: 1 }}
+                                            exit={{ x: 20, opacity: 0 }}
+                                            transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                        >
+                                            <InfoCard title="Preset">
+                                                <div className="text-sm font-semibold leading-6">{zoomName}</div>
+                                            </InfoCard>
+
+                                            <InfoCard title="Muscle">
+                                                <span
+                                                    className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs
+                         bg-white/60 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700"
+                                                >
+                                                    {zoomMuscle || "—"}
+                                                </span>
+                                            </InfoCard>
+
+                                            <InfoCard title="Guide">
+                                                {zoomGuide ? (
+                                                    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+                                                        {zoomGuide}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-sm text-gray-400">—</p>
+                                                )}
+                                            </InfoCard>
+                                        </motion.div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <ConfirmDialog
                 open={!!confirmId}
                 title="Delete preset"
@@ -403,5 +612,18 @@ function ActionBtn({ onClick, icon, label, color }: { onClick: () => void; icon:
             {icon}
             <span>{label}</span>
         </button>
+    );
+}
+
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div
+            className="rounded-2xl border border-gray-200/70 dark:border-gray-700/70
+                 bg-white/70 dark:bg-gray-900/60 backdrop-blur
+                 shadow-sm px-4 py-3"
+        >
+            <div className="text-[11px] uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">{title}</div>
+            {children}
+        </div>
     );
 }
