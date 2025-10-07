@@ -7,6 +7,7 @@ import { setupSwagger } from "./docs/swagger";
 import gym from "./routes/gym";
 import playlists from "./routes/playlists";
 import spending from "./routes/spending";
+import timetable from "./routes/timetable";
 import users from "./routes/users";
 
 const app = express();
@@ -46,7 +47,7 @@ const corsOptionsDelegate: CorsOptionsDelegate = (req, cb) => {
         origin,
         credentials: true,
         methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "x-user-id"],
         exposedHeaders: ["Set-Cookie"],
         maxAge: 86400,
     });
@@ -79,6 +80,7 @@ app.use("/users", users);
 app.use("/gym", gym);
 app.use("/playlists", playlists);
 app.use("/spending", spending);
+app.use("/tt", timetable);
 
 // Error handler (cuối cùng)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

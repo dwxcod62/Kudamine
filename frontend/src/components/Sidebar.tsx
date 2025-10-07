@@ -1,4 +1,4 @@
-import { LogOut, Moon, Plus, Sun, User as UserIcon, X } from "lucide-react";
+import { CalendarRange, LogOut, Moon, Plus, Sun, User as UserIcon, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import RollingOneChar from "../components/RollingOneChar";
@@ -143,7 +143,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile, currentUser, onSign
                 <NavItem icon={<IconGrid />} label="Gym Dashboard" to="/gym" onAfterClick={onCloseMobile} />
                 <NavItem icon={<IconChart />} label="Playlist" to="/playlist" onAfterClick={onCloseMobile} />
                 <NavItem icon={<IconTrend />} label="Investments" to="/investments" onAfterClick={onCloseMobile} />
-                <NavItem icon={<IconArrows />} label="Transfers" to="/transfers" onAfterClick={onCloseMobile} />
+                <NavItem icon={<CalendarRange className="h-5 w-5 block" />} label="Time Table" to="/timetable" onAfterClick={onCloseMobile} />
                 <NavItem icon={<IconCard />} label="Card" to="/card" onAfterClick={onCloseMobile} />
                 <NavItem icon={<IconGift />} label="Rewards" to="/rewards" onAfterClick={onCloseMobile} />
             </nav>

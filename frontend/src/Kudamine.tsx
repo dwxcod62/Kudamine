@@ -15,6 +15,7 @@ import TestPage from "./pages/Test";
 import WorkoutPageMock from "./pages/Test2";
 import RequireAuth from "./routes/RequireAuth";
 import { useAuthStore } from "./stores/auth";
+import TimeTablePage from "./pages/TimeTablePage";
 
 export default function Kudamine() {
     const location = useLocation();
@@ -104,6 +105,14 @@ export default function Kudamine() {
                             element={
                                 <RequireAuth>
                                     <TestPage />
+                                </RequireAuth>
+                            }
+                        />
+                        <Route
+                            path="/timetable"
+                            element={
+                                <RequireAuth>
+                                    <TimeTablePage />
                                 </RequireAuth>
                             }
                         />

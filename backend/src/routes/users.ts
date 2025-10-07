@@ -6,7 +6,7 @@ import jwt, { SignOptions } from "jsonwebtoken";
 import { signUsernameToken, verifyAndExtractUsername } from "../helpers/helpers";
 
 const prisma = new PrismaClient();
-const r = Router();
+const users = Router();
 
 /** --------------------------
  *  Env helpers / JWT config
@@ -62,7 +62,7 @@ const JWT_EXPIRES_IN: SignOptions["expiresIn"] = /^\d+$/.test(RAW_EXPIRES) ? Num
  *                     type: string
  *                     format: date-time
  */
-r.get("/", async (req, res) => {
+users.get("/", async (req, res) => {
     const take = Number(req.query.take ?? 20);
     const skip = Number(req.query.skip ?? 0);
     const users = await prisma.user.findMany({
@@ -110,7 +110,7 @@ r.get("/", async (req, res) => {
  *                   type: string
  *                   format: date-time
  */
-r.post("/", async (req, res) => {
+users.post("/", async (req, res) => {
     const { email, name } = (req.body ?? {}) as { email?: string; name?: string };
     const user = await prisma.user.create({
         data: {
@@ -136,7 +136,7 @@ r.post("/", async (req, res) => {
  *       200: { description: OK }
  *       404: { description: Not found }
  */
-r.get("/:id", async (req, res) => {
+users.get("/:id", async (req, res) => {
     const user = await prisma.user.findUnique({
         where: { id: req.params.id },
     });
@@ -168,7 +168,7 @@ r.get("/:id", async (req, res) => {
  *       200: { description: OK }
  *       404: { description: Not found }
  */
-r.patch("/:id", async (req, res) => {
+users.patch("/:id", async (req, res) => {
     const { email, name } = (req.body ?? {}) as { email?: string; name?: string };
     try {
         const updated = await prisma.user.update({
@@ -196,7 +196,7 @@ r.patch("/:id", async (req, res) => {
  *       200: { description: OK }
  *       404: { description: Not found }
  */
-r.delete("/:id", async (req, res) => {
+users.delete("/:id", async (req, res) => {
     try {
         await prisma.user.delete({ where: { id: req.params.id } });
         res.json({ ok: true });
@@ -220,7 +220,7 @@ r.delete("/:id", async (req, res) => {
  *       200: { description: OK }
  *       404: { description: Not found }
  */
-r.get("/:id/settings", async (req, res) => {
+users.get("/:id/settings", async (req, res) => {
     const settings = await prisma.userSettings.findUnique({
         where: { userId: req.params.id },
     });
@@ -252,7 +252,7 @@ r.get("/:id/settings", async (req, res) => {
  *     responses:
  *       200: { description: OK }
  */
-r.put("/:id/settings", async (req, res) => {
+users.put("/:id/settings", async (req, res) => {
     const { unit } = (req.body ?? {}) as { unit?: $Enums.Unit };
     const up = await prisma.userSettings.upsert({
         where: { userId: req.params.id },
@@ -279,7 +279,7 @@ r.put("/:id/settings", async (req, res) => {
  *     responses:
  *       200: { description: OK }
  */
-r.post("/code", async (req, res) => {
+users.post("/code", async (req, res) => {
     const { username } = (req.body ?? {}) as { username?: string };
     if (!username || typeof username !== "string") {
         return res.status(400).json({ message: "username is required" });
@@ -310,7 +310,7 @@ r.post("/code", async (req, res) => {
  *       200: { description: OK }
  *       401: { description: Invalid code }
  */
-r.post("/login-code", async (req, res) => {
+users.post("/login-code", async (req, res) => {
     const { code } = (req.body ?? {}) as { code?: string };
     if (!code || typeof code !== "string") {
         return res.status(400).json({ message: "code is required" });
@@ -332,4 +332,4 @@ r.post("/login-code", async (req, res) => {
     }
 });
 
-export default r;
+export default users;
