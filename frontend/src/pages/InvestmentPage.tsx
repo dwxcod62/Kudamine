@@ -2,7 +2,6 @@
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "../components/Modal";
-import { usePriceFeed } from "../hooks/usePriceFeed";
 import { DesignTokens } from "../styles/DesignTokens";
 
 /** ==== Types ==== */
@@ -62,69 +61,174 @@ function notify(message: string) {
 
 /** ==== usePrices: quản lý WS + giá theo nhiều symbol ==== */
 function usePrices(symbols: string[], positions: Position[], settings: Settings) {
-    const token = import.meta.env.VITE_FINNHUB_TOKEN as string;
+    const rawToken = import.meta.env.VITE_FINNHUB_TOKEN as string | undefined;
+    const token = rawToken?.trim();
     const [prices, setPrices] = useState<Record<string, number>>({});
     const wsRef = useRef<WebSocket | null>(null);
+    const prevSymbolsRef = useRef<string[]>([]);
     const lastAlertAt = useRef<Record<string, number>>({});
-    const sideKey = (sym: string, side: "up" | "down") => `${sym}:${side}`;
+    const positionsRef = useRef(positions);
+    const settingsRef = useRef(settings);
+    const reconnectTimer = useRef<number | null>(null);
+    const heartbeatRef = useRef<number | null>(null);
+    const openingRef = useRef(false); // guard duplicate connect attempts
+    const mountedRef = useRef(false); // avoid actions after unmount
 
     useEffect(() => {
-        if (!token) return;
-        const ws = new WebSocket(`wss://ws.finnhub.io?token=${token}`);
-        wsRef.current = ws;
+        positionsRef.current = positions;
+    }, [positions]);
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
 
-        ws.onopen = () => {
-            symbols.forEach((s) => s && ws.send(JSON.stringify({ type: "subscribe", symbol: s })));
-        };
+    const sideKey = (sym: string, side: "up" | "down") => `${sym}:${side}`;
 
-        ws.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            if (msg?.type !== "trade" || !Array.isArray(msg?.data)) return;
-            const last: Tick = msg.data[msg.data.length - 1];
-            if (!last?.s || typeof last.p !== "number") return;
+    const clearTimers = () => {
+        if (heartbeatRef.current) {
+            clearInterval(heartbeatRef.current);
+            heartbeatRef.current = null;
+        }
+        if (reconnectTimer.current) {
+            clearTimeout(reconnectTimer.current);
+            reconnectTimer.current = null;
+        }
+    };
 
-            setPrices((prev) => (prev[last.s] === last.p ? prev : { ...prev, [last.s]: last.p }));
+    const safeClose = (ws: WebSocket | null, code = 1000, reason = "cleanup") => {
+        try {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.close(code, reason);
+        } catch {}
+    };
 
-            if (!settings.notifyEnabled) return;
-            const related = positions.filter((p) => p.notify && p.symbol === last.s);
-            if (!related.length) return;
+    const connect = useCallback(
+        (attempt = 0) => {
+            if (!mountedRef.current || !token) return;
+            if (
+                openingRef.current ||
+                (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING))
+            ) {
+                return;
+            }
+            openingRef.current = true;
 
-            const band = settings.bandPct;
-            const now = Date.now();
+            const url = `wss://ws.finnhub.io?token=${encodeURIComponent(token)}`;
+            console.log("[FINNHUB] opening", { tokenLen: token.length, url });
 
-            for (const p of related) {
-                if (p.targetUp && last.p >= p.targetUp * (1 + band)) {
-                    const key = sideKey(p.symbol, "up");
-                    if (!lastAlertAt.current[key] || now - lastAlertAt.current[key] > settings.cooldownMs) {
-                        lastAlertAt.current[key] = now;
-                        notify(`${p.symbol} vượt mục tiêu ↑ ${fmt(p.targetUp)} → ${fmt(last.p)}`);
+            const ws = new WebSocket(url);
+            wsRef.current = ws;
+
+            const safeSend = (obj: unknown) => {
+                try {
+                    ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(obj));
+                } catch {}
+            };
+
+            ws.onopen = () => {
+                console.log("[FINNHUB] open");
+                openingRef.current = false;
+                // keep-alive ping (Finnhub tolerates this)
+                heartbeatRef.current = window.setInterval(() => {
+                    try {
+                        ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: "ping" }));
+                    } catch {}
+                }, 25_000);
+
+                // subscribe current set
+                prevSymbolsRef.current = symbols;
+                symbols.forEach((s) => s && safeSend({ type: "subscribe", symbol: s }));
+            };
+
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg?.type !== "trade" || !Array.isArray(msg?.data)) return;
+                const last: Tick = msg.data[msg.data.length - 1];
+                if (!last?.s || typeof last.p !== "number") return;
+
+                setPrices((prev) => (prev[last.s] === last.p ? prev : { ...prev, [last.s]: last.p }));
+
+                const s = settingsRef.current;
+                if (!s.notifyEnabled) return;
+                const band = s.bandPct;
+                const now = Date.now();
+                for (const p of positionsRef.current) {
+                    if (!p.notify || p.symbol !== last.s) continue;
+                    if (p.targetUp && last.p >= p.targetUp * (1 + band)) {
+                        const k = sideKey(p.symbol, "up");
+                        if (!lastAlertAt.current[k] || now - lastAlertAt.current[k] > s.cooldownMs) {
+                            lastAlertAt.current[k] = now;
+                            notify(`${p.symbol} vượt mục tiêu ↑ ${fmt(p.targetUp)} → ${fmt(last.p)}`);
+                        }
+                    }
+                    if (p.targetDown && last.p <= p.targetDown * (1 - band)) {
+                        const k = sideKey(p.symbol, "down");
+                        if (!lastAlertAt.current[k] || now - lastAlertAt.current[k] > s.cooldownMs) {
+                            lastAlertAt.current[k] = now;
+                            notify(`${p.symbol} thủng mục tiêu ↓ ${fmt(p.targetDown)} → ${fmt(last.p)}`);
+                        }
                     }
                 }
-                if (p.targetDown && last.p <= p.targetDown * (1 - band)) {
-                    const key = sideKey(p.symbol, "down");
-                    if (!lastAlertAt.current[key] || now - lastAlertAt.current[key] > settings.cooldownMs) {
-                        lastAlertAt.current[key] = now;
-                        notify(`${p.symbol} thủng mục tiêu ↓ ${fmt(p.targetDown)} → ${fmt(last.p)}`);
-                    }
+            };
+
+            ws.onerror = (ev) => {
+                console.warn("[FINNHUB] ws error", ev);
+            };
+
+            ws.onclose = (ev) => {
+                console.warn(" [FINNHUB] closed", { code: ev.code, reason: ev.reason || "" });
+                openingRef.current = false;
+                clearTimers();
+                wsRef.current = null;
+
+                // Reconnect policy: retry on abnormal/network closes (1006/1001/etc.)
+                if (!mountedRef.current) return;
+                const retryable = ev.code === 1006 || ev.code === 1001 || ev.code === 1000; // 1000 when Fast Refresh/StrictMode cleans up
+                if (retryable) {
+                    const backoffMs = Math.min(30_000, 1000 * Math.pow(1.8, attempt)) + Math.floor(Math.random() * 400);
+                    reconnectTimer.current = window.setTimeout(() => connect(attempt + 1), backoffMs);
                 }
+            };
+        },
+        [symbols, token]
+    );
+
+    useEffect(() => {
+        mountedRef.current = true;
+        if (!token) {
+            console.warn("[FINNHUB] Missing VITE_FINNHUB_TOKEN; skipping WS.");
+            return () => {
+                mountedRef.current = false;
+            };
+        }
+        connect(0);
+
+        // Pause when tab hidden (optional, reduces server closes on background tabs)
+        const onVis = () => {
+            if (!mountedRef.current) return;
+            const ws = wsRef.current;
+            if (document.visibilityState === "visible") {
+                // ensure connected
+                if (!ws || ws.readyState !== WebSocket.OPEN) connect(0);
             }
         };
+        document.addEventListener("visibilitychange", onVis);
 
         return () => {
+            mountedRef.current = false;
+            document.removeEventListener("visibilitychange", onVis);
+            clearTimers();
+            // gracefully unsubscribe & close
+            const ws = wsRef.current;
             try {
-                symbols.forEach((s) => {
-                    try {
-                        ws.send(JSON.stringify({ type: "unsubscribe", symbol: s }));
-                    } catch {}
-                });
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    prevSymbolsRef.current.forEach((s) => s && ws.send(JSON.stringify({ type: "unsubscribe", symbol: s })));
+                }
             } catch {}
-            ws.close();
+            safeClose(ws, 1000, "unmount");
             wsRef.current = null;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token]);
+    }, [connect, token]);
 
-    const prevSymbolsRef = useRef<string[]>([]);
+    // keep subs in sync on symbol changes without new socket
     useEffect(() => {
         const ws = wsRef.current;
         if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -133,10 +237,8 @@ function usePrices(symbols: string[], positions: Position[], settings: Settings)
         }
         const prev = new Set(prevSymbolsRef.current);
         const next = new Set(symbols);
-
         for (const s of prev) if (!next.has(s)) ws.send(JSON.stringify({ type: "unsubscribe", symbol: s }));
         for (const s of next) if (!prev.has(s)) ws.send(JSON.stringify({ type: "subscribe", symbol: s }));
-
         prevSymbolsRef.current = symbols;
     }, [symbols]);
 
@@ -184,7 +286,8 @@ export default function InvestmentsPage() {
     useEffect(() => savePositions(positions), [positions]);
 
     const symbols = useMemo(() => Array.from(new Set(positions.map((p) => p.symbol).filter(Boolean))).sort(), [positions]);
-    const prices = usePriceFeed(symbols);
+    // const prices = usePriceFeed(symbols);
+    const prices = usePrices(symbols, positions, settings);
 
     const { invested, marketValue, pnl } = useMemo(() => {
         let invested = 0;
