@@ -1,9 +1,21 @@
 import { CalendarRange, LogOut, Moon, Plus, Sun, User as UserIcon, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
+import {
+    IconArrows,
+    IconCard,
+    IconChart,
+    IconCog,
+    IconGift,
+    IconGrid,
+    IconLifeRing,
+    IconList,
+    IconShield,
+    IconTrend,
+    Logo,
+} from "../components/common/Icons";
 import RollingOneChar from "../components/RollingOneChar";
 import { useAuthStore } from "../stores/auth";
-import { IconArrows, IconCard, IconChart, IconCog, IconGift, IconGrid, IconLifeRing, IconList, IconShield, IconTrend, Logo } from "./common/Icons";
 
 type CurrentUser = {
     displayName?: string | null;
@@ -45,7 +57,7 @@ type SidebarProps = {
     isDark?: boolean;
 };
 
-export function Sidebar({ mobileOpen = false, onCloseMobile, currentUser, onSignOut, onToggleTheme, isDark }: SidebarProps) {
+export function DemoSomeThing({ mobileOpen = false, onCloseMobile, currentUser, onSignOut, onToggleTheme, isDark }: SidebarProps) {
     const user = useAuthStore((s) => s.user);
     // ===== Swipe to close (mobile) =====
     const panelRef = useRef<HTMLDivElement | null>(null);

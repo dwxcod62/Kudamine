@@ -33,6 +33,8 @@ model User {
   Position       Position[]
   WatchItem      WatchItem[]
   PriceAlert     PriceAlert[]
+  timetableTags   TimetableTag[]
+  timetableEvents TimetableEvent[]
 }
 
 model UserSettings {
@@ -299,3 +301,58 @@ model PriceSnapshot {
   @@unique([securityId, ts])
   @@index([securityId, ts])
 }
+
+
+// ========= Timetable =========
+
+
+enum TimetableStatus {
+  Planned
+  InProgress
+  Done
+  Canceled
+}
+
+model TimetableTag {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events    TimetableEvent[]
+
+  @@unique([userId, name])
+  @@index([userId, name])
+
+}
+
+model TimetableEvent {
+  id         String           @id @default(uuid())
+  userId     String
+
+  weekStart  DateTime
+  day        Int
+  title      String
+  startMin   Int
+  duration   Int
+  status     TimetableStatus  @default(Planned)
+
+  tagId      String?
+  tag        TimetableTag?    @relation(fields: [tagId], references: [id], onDelete: SetNull)
+  color      String?
+
+  endDate    DateTime?        @db.Date
+
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @default(now())
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, weekStart, day, startMin])
+  @@index([userId, weekStart])
+  @@index([userId, endDate]) 
+
+ }

@@ -1,0 +1,14 @@
+[
+    {
+        "id": 1,
+        "text": "🌟 Welcome back, {{name}}! Have a productive day 💪"
+    },
+    {
+        "id": 2,
+        "text": "🔥 New updates available this week — check your dashboard!"
+    },
+    {
+        "id": 3,
+        "text": "💰 Don’t forget to track your spending goals!"
+    }
+]
