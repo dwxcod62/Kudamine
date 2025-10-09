@@ -47,3 +47,24 @@ body {
 .blink {
     animation: blink 1s step-start infinite;
 }
+
+.rail-btn {
+    @apply h-11 w-11 rounded-2xl
+         inline-flex items-center justify-center
+         hover:bg-slate-100/60 dark:hover:bg-white/5
+         transition-colors;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+.animate-marquee {
+    display: inline-block;
+    animation: marquee 18s linear infinite;
+}

@@ -10,6 +10,7 @@
         "build": "tsc -b tsconfig.build.json && vite build"
     },
     "dependencies": {
+        "@heroui/react": "^2.8.5",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "framer-motion": "^12.23.22",
