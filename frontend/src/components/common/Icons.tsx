@@ -1,6 +1,6 @@
 import { CircleDollarSign, Dumbbell, ListMusic } from "lucide-react";
 
-export const IconGrid = () => <Dumbbell className="h-5 w-5" />;
+export const IconGym = () => <Dumbbell className="h-5 w-5" />;
 
 export const IconChart = () => <ListMusic className="h-5 w-5" />;
 

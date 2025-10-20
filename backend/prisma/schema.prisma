@@ -35,12 +35,14 @@ model User {
   PriceAlert     PriceAlert[]
   timetableTags   TimetableTag[]
   timetableEvents TimetableEvent[]
+  navPrefs        UserNavItem[]
 }
 
 model UserSettings {
   userId    String   @id
   unit      Unit     @default(kg)
   updatedAt DateTime @default(now())
+
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -356,3 +358,35 @@ model TimetableEvent {
   @@index([userId, endDate]) 
 
  }
+
+model NavItem { 
+  key       String   @id @db.VarChar(64)
+  label     String
+  path      String
+  iconKey   String?
+  group     String?
+  position  Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now())
+
+  prefs     UserNavItem[]
+
+  @@index([group, position])
+  @@index([isActive, position])
+
+}
+
+model UserNavItem {
+  userId   String
+  navKey   String        
+  enabled  Boolean @default(true)
+  position Int?
+  pinned   Boolean @default(false)
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nav    NavItem @relation(fields: [navKey], references: [key], onDelete: Cascade)
+
+  @@id([userId, navKey])   
+  @@index([userId, position])
+}

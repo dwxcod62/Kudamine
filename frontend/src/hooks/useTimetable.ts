@@ -64,6 +64,8 @@ export function useTimetable() {
     const user = useAuthStore((s) => s.user);
     const userId = user?.id ?? "demo-user";
 
+    console.log(userId);
+
     // time window
     const STEP = 30;
     const CELL_PX = 36; // mobile cell height

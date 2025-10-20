@@ -1,12 +1,13 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export function InlineAddPreset({ onAdd }: { onAdd: (name: string) => void | Promise<void> }) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
-
+    const navigate = useNavigate();
     if (!open) {
         return (
-            <button onClick={() => setOpen(true)} className="btn-ghost text-sm">
+            <button onClick={() => navigate("/preset")} className="btn-ghost text-sm">
                 + Custom
             </button>
         );

@@ -1,6 +1,8 @@
-export default {
+const { heroui } = require("@heroui/react");
+
+module.exports = {
     darkMode: "class",
     content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
     theme: { extend: {} },
-    plugins: [],
+    plugins: [heroui({})],
 };

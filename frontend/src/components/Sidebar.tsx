@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import RollingOneChar from "../components/RollingOneChar";
 import { useAuthStore } from "../stores/auth";
-import { IconArrows, IconCard, IconChart, IconCog, IconGift, IconGrid, IconLifeRing, IconList, IconShield, IconTrend, Logo } from "./common/Icons";
+import { IconArrows, IconCard, IconChart, IconCog, IconGift, IconGym, IconLifeRing, IconList, IconShield, IconTrend, Logo } from "./common/Icons";
 
 type CurrentUser = {
     displayName?: string | null;
@@ -140,7 +140,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile, currentUser, onSign
             <SectionTitle>Main Menu</SectionTitle>
             <nav className="leftnav mt-2 grid gap-1 px-2 pb-2">
                 <NavItem icon={<IconList />} label="Spending" to="/spending" onAfterClick={onCloseMobile} />
-                <NavItem icon={<IconGrid />} label="Gym Dashboard" to="/gym" onAfterClick={onCloseMobile} />
+                <NavItem icon={<IconGym />} label="Gym Dashboard" to="/gym" onAfterClick={onCloseMobile} />
                 <NavItem icon={<IconChart />} label="Playlist" to="/playlist" onAfterClick={onCloseMobile} />
                 <NavItem icon={<IconTrend />} label="Investments" to="/investments" onAfterClick={onCloseMobile} />
                 <NavItem icon={<CalendarRange className="h-5 w-5 block" />} label="Time Table" to="/timetable" onAfterClick={onCloseMobile} />

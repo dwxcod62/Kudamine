@@ -1,24 +1,24 @@
 // src/pages/GymLogPage.tsx
 import { Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Dumbbell, Plus, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DayLogFE } from "../hooks/useGymData";
-import { useGymData } from "../hooks/useGymData";
-import { useAuthStore } from "../stores/auth";
+import type { DayLogFE } from "../../hooks/useGymData";
+import { useGymData } from "../../hooks/useGymData";
+import { useAuthStore } from "../../stores/auth";
 
 // Components
-import { DesktopExerciseRow, type Exercise } from "../components/gym/DesktopExerciseRow";
-import { InlineAddPreset } from "../components/gym/InlineAddPreset";
-import { MobileExerciseCard } from "../components/gym/MobileExerciseCard";
-import { MonthCalendar } from "../components/gym/MonthCalendar";
-import { Stepper } from "../components/gym/Stepper";
-import { WeekScroller } from "../components/gym/WeekScroller";
+import { DesktopExerciseRow, type Exercise } from "../../components/gym/DesktopExerciseRow";
+import { InlineAddPreset } from "../../components/gym/InlineAddPreset";
+import { MobileExerciseCard } from "../../components/gym/MobileExerciseCard";
+import { MonthCalendar } from "../../components/gym/MonthCalendar";
+import { Stepper } from "../../components/gym/Stepper";
+import { WeekScroller } from "../../components/gym/WeekScroller";
 
 // Utils
-import { useLocalStorage } from "../hooks/useLocalStorage";
-import { addDays, addMonths, parseISO, startOfMonth, startOfWeek, ymdLocal } from "../utils/date";
-import { refreshOneDay } from "../utils/gymMap";
-import { norm } from "../utils/strings";
-import { kgToLb, lbToKg, type Unit } from "../utils/units";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
+import { addDays, addMonths, parseISO, startOfMonth, startOfWeek, ymdLocal } from "../../utils/date";
+import { refreshOneDay } from "../../utils/gymMap";
+import { norm } from "../../utils/strings";
+import { kgToLb, lbToKg, type Unit } from "../../utils/units";
 
 /* =================== Types =================== */
 type DaysDB = Record<string, DayLogFE>;
@@ -189,7 +189,7 @@ export default function GymLogPage() {
     const toggleFocusFE = async (tagLabel: string) => {
         const dayId = await ensureDayIdSynced();
 
-        const api = await (await import("../lib/gymApi")).GymApi.getDay(dayId);
+        const api = await (await import("../../lib/gymApi")).GymApi.getDay(dayId);
         const current: string[] = (api.focus ?? []).map((f: any) => (typeof f === "string" ? norm(f) : norm(f?.tag)));
 
         const want = norm(tagLabel);

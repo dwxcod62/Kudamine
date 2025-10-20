@@ -20,7 +20,7 @@ type LoginCodeResponse = {
         email?: string | null;
         avatarUrl?: string | null;
     };
-    token?: string; // nếu backend có phát hành JWT/session token thì trả kèm
+    token?: string;
 };
 
 export default function WindowsXPLogin() {
@@ -56,7 +56,7 @@ export default function WindowsXPLogin() {
         setLoading(true);
         try {
             const data = await postJSON<LoginCodeResponse>("/users/login-code", { code: code.trim() });
-            // lưu vào store (không lưu code):
+
             setAuth(
                 {
                     id: data.user.id,
@@ -67,6 +67,7 @@ export default function WindowsXPLogin() {
                 data.token
             );
             toast.success(`Welcome, ${data.user.name}!`);
+
             navigate(from, { replace: true });
         } catch (err: any) {
             toast.error(err?.message || "Invalid code. Please try again.");

@@ -5,6 +5,7 @@ import express, { NextFunction, Request, Response } from "express";
 import path from "path";
 import { setupSwagger } from "./docs/swagger";
 import gym from "./routes/gym";
+import navbar from "./routes/navbar";
 import playlists from "./routes/playlists";
 import spending from "./routes/spending";
 import timetable from "./routes/timetable";
@@ -81,6 +82,7 @@ app.use("/gym", gym);
 app.use("/playlists", playlists);
 app.use("/spending", spending);
 app.use("/tt", timetable);
+app.use("/navbar", navbar);
 
 // Error handler (cuối cùng)
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

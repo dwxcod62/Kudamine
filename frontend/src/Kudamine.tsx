@@ -3,14 +3,15 @@ import { lazy, Suspense, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Header from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
-import { DemoSomeThing } from "./pages/DemoSomething";
+import DemoSomeThing from "./pages/DemoSomething";
+import { Test2 } from "./pages/Test2";
 import TestSidebar from "./pages/Test_side_bar";
 import RequireAuth from "./routes/RequireAuth";
 import { useAuthStore } from "./stores/auth";
 import { DesignTokens } from "./styles/DesignTokens";
 
 /* ===== Lazy pages (code-splitting) ===== */
-const GymLogPage = lazy(() => import("./pages/GymLogPage"));
+const GymLogPage = lazy(() => import("./pages/Gyms/GymLogPage"));
 const InvestmentsPage = lazy(() => import("./pages/InvestmentPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const PlaylistPage = lazy(() => import("./pages/PlaylistPage"));
@@ -18,7 +19,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 // SpendingPage là named export -> map sang default cho lazy
 const SpendingPage = lazy(() => import("./pages/SpendingPage").then((m) => ({ default: m.SpendingPage })));
 const TestPage = lazy(() => import("./pages/Test"));
-const WorkoutPageMock = lazy(() => import("./pages/Test2"));
+const WorkoutPageMock = lazy(() => import("./pages/Gyms/PresetsPage"));
 const TimeTablePage = lazy(() => import("./pages/TimeTablePage"));
 
 /* ===== Fallback UI khi đang load chunk ===== */
@@ -52,6 +53,7 @@ export default function Kudamine() {
                         <Route path="/test" element={<TestPage />} />
                         <Route path="/test_side_bar" element={<TestSidebar />} />
                         <Route path="/demo" element={<DemoSomeThing />} />
+                        {/* <Route path="/test2" element={<Test2 />} /> */}
                     </Routes>
                 </Suspense>
             </div>
@@ -109,7 +111,7 @@ export default function Kudamine() {
                                 }
                             />
                             <Route
-                                path="/test2"
+                                path="/preset"
                                 element={
                                     <RequireAuth>
                                         <WorkoutPageMock />
@@ -117,10 +119,10 @@ export default function Kudamine() {
                                 }
                             />
                             <Route
-                                path="/test1"
+                                path="/test2"
                                 element={
                                     <RequireAuth>
-                                        <TestPage />
+                                        <Test2 />
                                     </RequireAuth>
                                 }
                             />
