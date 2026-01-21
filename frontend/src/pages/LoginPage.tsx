@@ -94,140 +94,148 @@ export default function WindowsXPLogin() {
     const cursor = useBlinkCursor(500);
 
     return (
-        <div className="relative min-h-[100svh] w-screen overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] syne-mono-regular">
-            <img src={Bground} alt="background" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side,transparent,rgba(0,0,0,.25))]" />
+        // <div className="relative min-h-[100svh] w-screen overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] syne-mono-regular">
+        //     <img src={Bground} alt="background" className="absolute inset-0 h-full w-full object-cover" />
+        //     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side,transparent,rgba(0,0,0,.25))]" />
 
-            <div className="absolute left-1/2 top-1/2 w-[90vw] max-w-[720px] px-4 -translate-x-1/2 -translate-y-1/2">
-                <div
-                    className="rounded-t-xl px-4 py-2 text-white shadow"
-                    style={{
-                        background: "linear-gradient(180deg, #3a6ea5 0%, #2a4e7c 100%)",
-                        boxShadow: "0 2px 0 rgba(0,0,0,.15) inset",
-                    }}
-                >
-                    <div className="flex items-center justify-between">
-                        <div className="font-bold tracking-wide">Log On to Kudamine</div>
-                        <div className="text-xs opacity-90">
-                            <div className="text-xs opacity-90 flex items-center gap-1">
-                                <span>{cursor}:</span>
-                                <span>Kudamine</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        //     <div className="absolute left-1/2 top-1/2 w-[90vw] max-w-[720px] px-4 -translate-x-1/2 -translate-y-1/2">
+        //         <div
+        //             className="rounded-t-xl px-4 py-2 text-white shadow"
+        //             style={{
+        //                 background: "linear-gradient(180deg, #3a6ea5 0%, #2a4e7c 100%)",
+        //                 boxShadow: "0 2px 0 rgba(0,0,0,.15) inset",
+        //             }}
+        //         >
+        //             <div className="flex items-center justify-between">
+        //                 <div className="font-bold tracking-wide">Log On to Kudamine</div>
+        //                 <div className="text-xs opacity-90">
+        //                     <div className="text-xs opacity-90 flex items-center gap-1">
+        //                         <span>{cursor}:</span>
+        //                         <span>Kudamine</span>
+        //                     </div>
+        //                 </div>
+        //             </div>
+        //         </div>
 
-                <div
-                    className="rounded-b-xl border-x border-b p-6"
-                    style={{
-                        borderColor: c.border,
-                        background: "linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(240,248,255,.9) 100%)",
-                    }}
-                >
-                    <div className="mb-5 text-sm text-black/80">
-                        <RollingOneChar text="Enter your login code 🔑" tickMs={35} scrambleMs={750} pauseMs={60} />
-                    </div>
+        //         <div
+        //             className="rounded-b-xl border-x border-b p-6"
+        //             style={{
+        //                 borderColor: c.border,
+        //                 background: "linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(240,248,255,.9) 100%)",
+        //             }}
+        //         >
+        //             <div className="mb-5 text-sm text-black/80">
+        //                 <RollingOneChar text="Enter your login code 🔑" tickMs={35} scrambleMs={750} pauseMs={60} />
+        //             </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] items-center gap-5">
-                        <div className="flex flex-col items-center">
-                            <div
-                                className="grid place-items-center h-[88px] w-[88px] rounded-xl border shadow"
-                                style={{
-                                    background: "linear-gradient(180deg, #f8fcff 0%, #dfefff 100%)",
-                                    borderColor: c.winSilver,
-                                    boxShadow: "inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.2)",
-                                }}
-                            >
-                                <img
-                                    alt="user"
-                                    width={88}
-                                    height={88}
-                                    className="h-full w-full object-cover"
-                                    src={`https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(randomText)}`}
-                                />
-                            </div>
-                            <div className="mt-2 text-black/90" />
-                        </div>
+        //             <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] items-center gap-5">
+        //                 <div className="flex flex-col items-center">
+        //                     <div
+        //                         className="grid place-items-center h-[88px] w-[88px] rounded-xl border shadow"
+        //                         style={{
+        //                             background: "linear-gradient(180deg, #f8fcff 0%, #dfefff 100%)",
+        //                             borderColor: c.winSilver,
+        //                             boxShadow: "inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.2)",
+        //                         }}
+        //                     >
+        //                         <img
+        //                             alt="user"
+        //                             width={88}
+        //                             height={88}
+        //                             className="h-full w-full object-cover"
+        //                             src={`https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(randomText)}`}
+        //                         />
+        //                     </div>
+        //                     <div className="mt-2 text-black/90" />
+        //                 </div>
 
-                        <form onSubmit={onSubmit} className="space-y-3">
-                            <div className="text-xs text-black/70 flex items-center gap-1">
-                                <span>Code for:</span>
-                                <span className="font-mono text-black">{randomText}</span>
-                            </div>
+        //                 <form onSubmit={onSubmit} className="space-y-3">
+        //                     <div className="text-xs text-black/70 flex items-center gap-1">
+        //                         <span>Code for:</span>
+        //                         <span className="font-mono text-black">{randomText}</span>
+        //                     </div>
 
-                            <div className="relative max-w-md">
-                                <input
-                                    type="text"
-                                    inputMode="text"
-                                    autoCapitalize="none"
-                                    autoCorrect="off"
-                                    spellCheck={false}
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value)}
-                                    onKeyUp={onKey}
-                                    onFocus={() => setFocused(true)}
-                                    onBlur={() => setFocused(false)}
-                                    className="w-full rounded border px-3 py-3 text-[16px] outline-none transition"
-                                    style={{
-                                        borderColor: focused ? c.blue : c.winSilver,
-                                        boxShadow: focused ? "0 0 0 2px rgba(58,110,165,.35)" : "inset 0 1px 0 #fff, 0 1px 0 rgba(0,0,0,.05)",
-                                        background: "linear-gradient(180deg, #ffffff 0%, #f3f6fb 100%)",
-                                    }}
-                                    placeholder="e.g. KDMN-9F2X-7Q..."
-                                />
-                                {capsOn && <div className="absolute -bottom-6 left-0 text-xs text-red-700">Caps Lock is on.</div>}
-                            </div>
+        //                     <div className="relative max-w-md">
+        //                         <input
+        //                             type="text"
+        //                             inputMode="text"
+        //                             autoCapitalize="none"
+        //                             autoCorrect="off"
+        //                             spellCheck={false}
+        //                             value={code}
+        //                             onChange={(e) => setCode(e.target.value)}
+        //                             onKeyUp={onKey}
+        //                             onFocus={() => setFocused(true)}
+        //                             onBlur={() => setFocused(false)}
+        //                             className="w-full rounded border px-3 py-3 text-[16px] outline-none transition"
+        //                             style={{
+        //                                 borderColor: focused ? c.blue : c.winSilver,
+        //                                 boxShadow: focused ? "0 0 0 2px rgba(58,110,165,.35)" : "inset 0 1px 0 #fff, 0 1px 0 rgba(0,0,0,.05)",
+        //                                 background: "linear-gradient(180deg, #ffffff 0%, #f3f6fb 100%)",
+        //                             }}
+        //                             placeholder="e.g. KDMN-9F2X-7Q..."
+        //                         />
+        //                         {capsOn && <div className="absolute -bottom-6 left-0 text-xs text-red-700">Caps Lock is on.</div>}
+        //                     </div>
 
-                            {error && (
-                                <div
-                                    className="rounded border px-3 py-3 text-sm"
-                                    style={{ borderColor: "#ffb4b4", background: "#fff5f5", color: "#8c1d18" }}
-                                >
-                                    {error}
-                                </div>
-                            )}
+        //                     {error && (
+        //                         <div
+        //                             className="rounded border px-3 py-3 text-sm"
+        //                             style={{ borderColor: "#ffb4b4", background: "#fff5f5", color: "#8c1d18" }}
+        //                         >
+        //                             {error}
+        //                         </div>
+        //                     )}
 
-                            <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="rounded px-4 py-2 text-sm font-semibold text-white shadow w-full sm:w-auto disabled:opacity-70"
-                                    style={{
-                                        background: "linear-gradient(180deg, #4aa52e 0%, #2a7a16 100%)",
-                                        boxShadow: "inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.25)",
-                                    }}
-                                >
-                                    {loading ? "Logging in..." : "Log On"}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setCode("");
-                                        setError(null);
-                                    }}
-                                    className="rounded px-4 py-2 text-sm font-semibold text-black/80 w-full sm:w-auto"
-                                    style={{
-                                        background: "linear-gradient(180deg, #ffffff 0%, #e9edf2 100%)",
-                                        boxShadow: "inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15)",
-                                        border: `1px solid ${c.winSilver}`,
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+        //                     <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        //                         <button
+        //                             type="submit"
+        //                             disabled={loading}
+        //                             className="rounded px-4 py-2 text-sm font-semibold text-white shadow w-full sm:w-auto disabled:opacity-70"
+        //                             style={{
+        //                                 background: "linear-gradient(180deg, #4aa52e 0%, #2a7a16 100%)",
+        //                                 boxShadow: "inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.25)",
+        //                             }}
+        //                         >
+        //                             {loading ? "Logging in..." : "Log On"}
+        //                         </button>
+        //                         <button
+        //                             type="button"
+        //                             onClick={() => {
+        //                                 setCode("");
+        //                                 setError(null);
+        //                             }}
+        //                             className="rounded px-4 py-2 text-sm font-semibold text-black/80 w-full sm:w-auto"
+        //                             style={{
+        //                                 background: "linear-gradient(180deg, #ffffff 0%, #e9edf2 100%)",
+        //                                 boxShadow: "inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.15)",
+        //                                 border: `1px solid ${c.winSilver}`,
+        //                             }}
+        //                         >
+        //                             Cancel
+        //                         </button>
+        //                     </div>
+        //                 </form>
+        //             </div>
 
-                    <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-black/70">
-                        <div className="flex items-center gap-2">
-                            <ShutdownButton />
-                            <span className="hidden sm:inline">Click Shut Down to turn off the computer.</span>
-                        </div>
-                        <LangClock />
-                    </div>
-                </div>
-            </div>
-        </div>
+        //             <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-black/70">
+        //                 <div className="flex items-center gap-2">
+        //                     <ShutdownButton />
+        //                     <span className="hidden sm:inline">Click Shut Down to turn off the computer.</span>
+        //                 </div>
+        //                 <LangClock />
+        //             </div>
+        //         </div>
+        //     </div>
+        // </div>
+
+        <a
+  href="https://nam10.safelinks.protection.outlook.com/?url=https%3A%2F%2Flearn.eltngl.com%2F&data=05%7C02%7Canguy114%40bruinmail.slcc.edu%7C88867d42648340e49a1a08de585f91d1%7C0381a94117984cb686deed07c83a7042%7C1%7C0%7C639045364657446354%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=VMLNr3J8sQKMdh8U7WPjruvAYRwIttIQg4bd1XmUmp0%3D&reserved=0"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  👉 book here
+</a>
     );
 }
 
