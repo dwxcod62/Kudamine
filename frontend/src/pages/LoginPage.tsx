@@ -458,6 +458,7 @@ export default function WindowsXPLogin() {
         <div
             style={{
                 height: "100vh",
+                width: "100vw",
                 overflow: "hidden",
                 background: "radial-gradient(circle at top, #0f172a, #020617)",
                 padding: "30px 40px",
