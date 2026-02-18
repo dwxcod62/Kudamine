@@ -390,3 +390,15 @@ model UserNavItem {
   @@id([userId, navKey])   
   @@index([userId, position])
 }
+
+model LuckyCode {
+  id        String   @id @default(uuid())
+  code      String   @unique @db.VarChar(64)
+  name      String? 
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+
+  @@index([code])
+  @@index([used])
+}
