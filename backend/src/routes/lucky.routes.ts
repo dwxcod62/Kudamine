@@ -6,8 +6,56 @@ const prisma = new PrismaClient();
 const router = Router();
 
 /**
- * POST /api/lucky/redeem
- * body: { code: string, name?: string }
+ * @swagger
+ * tags:
+ *   name: Lucky
+ *   description: Lucky Code API
+ */
+
+/**
+ * @swagger
+ * /api/lucky/redeem:
+ *   post:
+ *     summary: Redeem lucky code
+ *     tags: [Lucky]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: TET2026ABC
+ *               name:
+ *                 type: string
+ *                 example: Duc
+ *     responses:
+ *       200:
+ *         description: Redeem success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: TET2026ABC
+ *                 usedAt:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Missing code
+ *       404:
+ *         description: Code not found
+ *       409:
+ *         description: Code already used
  */
 router.post("/redeem", async (req, res) => {
     const { code, name } = req.body;
@@ -17,7 +65,6 @@ router.post("/redeem", async (req, res) => {
     }
 
     try {
-        // Dùng transaction để tránh 2 tab redeem cùng lúc
         const result = await prisma.$transaction(async (tx) => {
             const lucky = await tx.luckyCode.findUnique({
                 where: { code },
@@ -62,23 +109,61 @@ router.post("/redeem", async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/lucky/{code}:
+ *   get:
+ *     summary: Get lucky code status
+ *     tags: [Lucky]
+ *     parameters:
+ *       - in: path
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: TET2026ABC
+ *     responses:
+ *       200:
+ *         description: Code status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: string
+ *                 used:
+ *                   type: boolean
+ *                 name:
+ *                   type: string
+ *                 usedAt:
+ *                   type: string
+ *                   format: date-time
+ *       404:
+ *         description: Code not found
+ */
 router.get("/:code", async (req, res) => {
     const { code } = req.params;
 
-    const lucky = await prisma.luckyCode.findUnique({
-        where: { code },
-    });
+    try {
+        const lucky = await prisma.luckyCode.findUnique({
+            where: { code },
+        });
 
-    if (!lucky) {
-        return res.status(404).json({ message: "Code not found" });
+        if (!lucky) {
+            return res.status(404).json({ message: "Code not found" });
+        }
+
+        return res.json({
+            code: lucky.code,
+            used: lucky.used,
+            name: lucky.name,
+            usedAt: lucky.usedAt,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Internal server error" });
     }
-
-    return res.json({
-        code: lucky.code,
-        used: lucky.used,
-        name: lucky.name,
-        usedAt: lucky.usedAt,
-    });
 });
 
 export default router;
