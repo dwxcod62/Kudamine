@@ -166,4 +166,59 @@ router.get("/:code", async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/lucky/create:
+ *   post:
+ *     summary: Create a new lucky code
+ *     tags: [Lucky]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: TET2026VIP
+ *     responses:
+ *       200:
+ *         description: Code created successfully
+ *       409:
+ *         description: Code already exists
+ */
+router.post("/create", async (req, res) => {
+    let { code } = req.body;
+
+    try {
+        // Nếu không truyền code → tự generate
+        if (!code) {
+            code = "LC-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        const existing = await prisma.luckyCode.findUnique({
+            where: { code },
+        });
+
+        if (existing) {
+            return res.status(409).json({ message: "Code already exists" });
+        }
+
+        const created = await prisma.luckyCode.create({
+            data: {
+                code,
+            },
+        });
+
+        return res.json({
+            success: true,
+            code: created.code,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 export default router;
