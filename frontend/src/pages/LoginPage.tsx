@@ -243,7 +243,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-}
+},
 
     resultImage: {
         width: "100%",
