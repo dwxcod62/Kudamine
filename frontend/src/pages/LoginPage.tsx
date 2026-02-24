@@ -156,26 +156,30 @@ function OptionCard({
 
 const styles: { [key: string]: React.CSSProperties } = {
     page: {
-  background: "#0f0f0f",
-  minHeight: "100vh",
-  width: "100vw",
-  display: "flex",
-  color: "#fff",
-  fontFamily: "sans-serif",
-},
+        background: "#0f0f0f",
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        color: "#fff",
+        fontFamily: "sans-serif",
+        padding: "2%",
+    },
 
-   wrapper: {
-  display: "flex",
-  width: "100%",
-  height: "100vh",
-},
+    wrapper: {
+        display: "flex",
+        gap: "5%",
+        alignItems: "stretch",
+        width: "95%",
+        maxWidth: "1600px",
+    },
 
     left: {
-  flex: 0.4,
-  background: "#1a1a1a",
-  padding: "3%",
-  overflowY: "auto",
-},
+        flex: 1,
+        background: "#1a1a1a",
+        padding: "3%",
+        borderRadius: "20px",
+    },
 
     group: {
         marginBottom: "6%",
@@ -238,12 +242,15 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
 
     right: {
-  flex: 0.6,
-  background: "#B9CF9E",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-},
+        flex: 1,
+        aspectRatio: "1 / 1",
+        background: "#B9CF9E",
+        borderRadius: "20px",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+    },
 
     resultImage: {
         width: "100%",
