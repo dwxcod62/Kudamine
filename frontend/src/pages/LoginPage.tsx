@@ -158,6 +158,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     page: {
         background: "#0f0f0f",
         minHeight: "100vh",
+        minWidth: "100vw",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
