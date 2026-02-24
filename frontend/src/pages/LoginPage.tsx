@@ -158,27 +158,24 @@ const styles: { [key: string]: React.CSSProperties } = {
     page: {
   background: "#0f0f0f",
   minHeight: "100vh",
-  width: "100vw",   // full viewport width
+  width: "100vw",
   display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
   color: "#fff",
   fontFamily: "sans-serif",
 },
 
    wrapper: {
   display: "flex",
-  gap: "4%",
-  alignItems: "stretch",
-  width: "100%",   // full chiều ngang
+  width: "100%",
+  height: "100vh",
 },
 
     left: {
-        flex: 1,
-        background: "#1a1a1a",
-        padding: "3%",
-        borderRadius: "20px",
-    },
+  flex: 0.4,
+  background: "#1a1a1a",
+  padding: "3%",
+  overflowY: "auto",
+},
 
     group: {
         marginBottom: "6%",
@@ -241,15 +238,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
 
     right: {
-        flex: 1,
-        aspectRatio: "1 / 1",
-        background: "#B9CF9E",
-        borderRadius: "20px",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-    },
+  flex: 0.6,
+  background: "#B9CF9E",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
 
     resultImage: {
         width: "100%",
