@@ -40,7 +40,15 @@ export default function CokeExperiment() {
         <div style={styles.page}>
             <div style={styles.wrapper}>
                 <div style={styles.left}>
-                    <h2 style={{ marginBottom: "5%" }}>Coca + Mentos Filter</h2>
+                    <h2
+  style={{
+    marginBottom: "5%",
+    fontWeight: "800",   // đậm hơn (bold hơn)
+    fontSize: "2.2rem"   // chữ to hơn
+  }}
+>
+  How can we make a Coke and Mentos fountain that looks strong but also stable?
+</h2>
 
                     <Section title="Bottle Position">
                         <OptionCard
