@@ -52,7 +52,7 @@ const scale = (v: number) => v / SETTINGS.intensity;
 
 /* ================= COMPONENT ================= */
 
-export default function DashboardPage() {
+export default function LoginPage () {
     const [popups, setPopups] = useState<any[]>([]);
     const [news, setNews] = useState<any[]>([]);
     const [activeSolutions, setActiveSolutions] = useState<string[]>([]);
