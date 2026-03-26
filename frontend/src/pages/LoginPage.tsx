@@ -1,269 +1,230 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 
-type BottlePosition = "upright" | "tilted";
-type MentosAmount = "one" | "multiple";
-type DropStyle = "single" | "step";
+/* ================= SETTINGS ================= */
 
+const SETTINGS = {
+    intensity: 1.5,
 
-const OPTION_IMAGES = {
-    upright: "https://i.imgur.com/TUO6R4D.png",
-    tilted: "https://i.imgur.com/yW2nKRB.png",
-    one: "https://i.imgur.com/2ZeiuAU.png",
-    multiple: "https://i.imgur.com/2zmwhXB.png",
-    single: "https://i.imgur.com/cEBiryu.png",
-    step: "https://i.imgur.com/Ob5XOFz.png",
+    popup: {
+        interval: 200,
+        lifetime: 10000,
+        max: 30,
+
+        // 👇 focus mode
+        focusInterval: 1200,
+        focusLifetime: 8000,
+        focusMax: 2,
+    },
+
+    news: {
+        interval: 700,
+        lifetime: 5000,
+        max: 10,
+    },
+
+    chaos: {
+        startDelay: 10000,
+    },
 };
 
-const RESULT_IMAGES = {
-    upright_one: "https://i.imgur.com/fmp2pOy.png",
-    tilted_one: "https://i.imgur.com/WC9HUMn.png",
-    upright_multiple_single: "https://i.imgur.com/o4BuLw4.png",
-    upright_multiple_step: "https://i.imgur.com/2dhOwfr.png",
-    tilted_multiple_single: "https://i.imgur.com/IpJ97Nw.png",
-    tilted_multiple_step: "https://i.imgur.com/BUQ2IlW.png",
-};
+/* ================= DATA ================= */
 
-export default function CokeExperiment() {
-    const [position, setPosition] = useState<BottlePosition>("upright");
-    const [amount, setAmount] = useState<MentosAmount>("one");
-    const [dropStyle, setDropStyle] = useState<DropStyle>("step");
+const englishMessages = ["Learn 5 new words today", "Practice speaking for 10 minutes", "Repeat after native speakers", "Watch English videos daily"];
 
-    const getResultImage = () => {
-        if (amount === "one") {
-            return position === "upright" ? RESULT_IMAGES.upright_one : RESULT_IMAGES.tilted_one;
-        }
+const spamMessages = ["Battery low!", "Update available", "Storage almost full"];
 
-        return RESULT_IMAGES[`${position}_multiple_${dropStyle}` as keyof typeof RESULT_IMAGES];
+const realNews = ["Global markets fluctuate today"];
+const fakeNews = ["🔥 You won’t believe this!"];
+
+/* ================= SOLUTIONS ================= */
+
+const solutions = [
+    { key: "sources", text: "Choose important sources" },
+    { key: "notifications", text: "Turn off notifications" },
+    { key: "focus", text: "Focus on one thing at a time" },
+];
+
+/* ================= HELPERS ================= */
+
+const rand = (min: number, max: number) => Math.random() * (max - min) + min;
+
+const scale = (v: number) => v / SETTINGS.intensity;
+
+/* ================= COMPONENT ================= */
+
+export default function DashboardPage() {
+    const [popups, setPopups] = useState<any[]>([]);
+    const [news, setNews] = useState<any[]>([]);
+    const [activeSolutions, setActiveSolutions] = useState<string[]>([]);
+
+    const [started, setStarted] = useState(false);
+    const [startChaos, setStartChaos] = useState(false);
+
+    const toggleSolution = (key: string) => {
+        setActiveSolutions((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
     };
 
+    const isFocus = activeSolutions.includes("focus");
+    const isFilter = activeSolutions.includes("sources");
+    const isNoNoti = activeSolutions.includes("notifications");
+
+    const handleStart = () => {
+        setStarted(true);
+        setTimeout(() => setStartChaos(true), SETTINGS.chaos.startDelay);
+    };
+
+    /* ================= CLEAR POPUPS WHEN SWITCH MODE ================= */
+
+    useEffect(() => {
+        setPopups([]); // reset khi đổi mode
+    }, [isFocus]);
+
+    /* ================= POPUPS ================= */
+
+    useEffect(() => {
+        if (!startChaos) return;
+
+        const popupInterval = isFocus ? SETTINGS.popup.focusInterval : scale(SETTINGS.popup.interval);
+
+        const popupLifetime = isFocus ? SETTINGS.popup.focusLifetime : scale(SETTINGS.popup.lifetime);
+
+        const popupMax = isFocus ? SETTINGS.popup.focusMax : SETTINGS.popup.max;
+
+        const interval = setInterval(() => {
+            const isEnglish = isFocus ? true : isNoNoti ? true : Math.random() < 0.7;
+
+            const text = isEnglish
+                ? englishMessages[Math.floor(Math.random() * englishMessages.length)]
+                : spamMessages[Math.floor(Math.random() * spamMessages.length)];
+
+            const popup = {
+                id: Math.random(),
+                text,
+                isEnglish,
+                top: rand(10, 80),
+                left: isFocus ? rand(30, 70) : rand(5, 85),
+            };
+
+            setPopups((prev) => [...prev.slice(-popupMax), popup]);
+
+            setTimeout(() => {
+                setPopups((prev) => prev.filter((p) => p.id !== popup.id));
+            }, popupLifetime);
+        }, popupInterval);
+
+        return () => clearInterval(interval);
+    }, [startChaos, activeSolutions]);
+
+    /* ================= NEWS ================= */
+
+    useEffect(() => {
+        if (!startChaos || isFocus) return;
+
+        const interval = setInterval(() => {
+            const pool = isFilter ? realNews : [...realNews, ...fakeNews];
+
+            const item = {
+                id: Math.random(),
+                text: pool[Math.floor(Math.random() * pool.length)],
+                top: rand(5, 85),
+                left: rand(5, 85),
+            };
+
+            setNews((prev) => [...prev.slice(-10), item]);
+
+            setTimeout(() => {
+                setNews((prev) => prev.filter((n) => n.id !== item.id));
+            }, scale(SETTINGS.news.lifetime));
+        }, scale(SETTINGS.news.interval));
+
+        return () => clearInterval(interval);
+    }, [startChaos, activeSolutions]);
+
+    /* ================= UI ================= */
+
     return (
-        <div style={styles.page}>
-            <div style={styles.wrapper}>
-                <div style={styles.left}>
-                    <h2
-  style={{
-    marginBottom: "5%",
-    fontWeight: "800",   // đậm hơn (bold hơn)
-    fontSize: "2.2rem"   // chữ to hơn
-  }}
->
-  How can we make a Coke and Mentos fountain that looks strong but also stable?
-</h2>
+        <div className="relative min-h-screen bg-[#0f1115] overflow-hidden">
+            {startChaos && (
+                <>
+                    {/* ===== BACKGROUND ===== */}
+                    <div className={`absolute inset-0 z-[1] transition-all duration-500 ${isFocus ? "opacity-10 blur-sm" : ""}`}>
+                        {news.map((n) => (
+                            <div
+                                key={n.id}
+                                className="absolute bg-yellow-900/80 text-white p-2 rounded"
+                                style={{
+                                    top: `${n.top}vh`,
+                                    left: `${n.left}vw`,
+                                }}
+                            >
+                                📰 {n.text}
+                            </div>
+                        ))}
+                    </div>
 
-                    <Section title="Bottle Position">
-                        <OptionCard
-                            label="Upright"
-                            image={OPTION_IMAGES.upright}
-                            checked={position === "upright"}
-                            onClick={() => setPosition("upright")}
-                        />
-                        <OptionCard
-                            label="Tilted"
-                            image={OPTION_IMAGES.tilted}
-                            checked={position === "tilted"}
-                            onClick={() => setPosition("tilted")}
-                        />
-                    </Section>
+                    {/* ===== POPUP ===== */}
+                    <div className="absolute inset-0 z-[5] pointer-events-none">
+                        {popups.map((p) => (
+                            <div
+                                key={p.id}
+                                className={`
+                                    absolute rounded-2xl transition-all duration-700 ease-out
+                                    
+                                    ${p.isEnglish ? "bg-emerald-500 text-white" : "bg-[#1a1d24] text-gray-300"}
 
-                    <Section title="Mentos Amount">
-                        <OptionCard
-                            label="One"
-                            image={OPTION_IMAGES.one}
-                            checked={amount === "one"}
-                            onClick={() => {
-                                setAmount("one");
-                                setDropStyle("step");
-                            }}
-                        />
-                        <OptionCard
-                            label="Multiple"
-                            image={OPTION_IMAGES.multiple}
-                            checked={amount === "multiple"}
-                            onClick={() => setAmount("multiple")}
-                        />
-                    </Section>
+                                    ${isFocus ? "scale-150 text-2xl font-semibold px-10 py-6 shadow-[0_0_60px_rgba(16,185,129,1)]" : "p-4"}
 
-                    <Section title="Drop Style">
-                        <OptionCard
-                            label="All at once"
-                            image={OPTION_IMAGES.single}
-                            checked={dropStyle === "single"}
-                            disabled={amount === "one"}
-                            onClick={() => setDropStyle("single")}
-                        />
-                        <OptionCard
-                            label="One by one"
-                            image={OPTION_IMAGES.step}
-                            checked={dropStyle === "step"}
-                            disabled={amount === "one"}
-                            onClick={() => setDropStyle("step")}
-                        />
-                    </Section>
+                                    ${isFocus && !p.isEnglish ? "hidden" : ""}
+                                `}
+                                style={{
+                                    top: `${p.top}vh`,
+                                    left: `${p.left}vw`,
+                                }}
+                            >
+                                🔔 {p.text}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* ===== START ===== */}
+            {!started && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <button onClick={handleStart} className="px-12 py-6 bg-white rounded-full text-xl text-black hover:scale-105 transition">
+                        Start
+                    </button>
                 </div>
+            )}
 
-                <div style={styles.right}>
-                    <img src={getResultImage()} alt="Result" style={styles.resultImage} />
+            {/* ===== MAIN CONTENT ===== */}
+            {started && (
+                <div className="relative z-[10] flex flex-col items-center justify-center min-h-screen gap-12">
+                    <h1 className="text-5xl text-white/80">Information Overload</h1>
+
+                    <div className="flex gap-16">
+                        {/* WHY */}
+                        <div className="bg-[#1a1d24] p-8 rounded-2xl text-lg">
+                            <p className="text-white text-2xl mb-4">WHY</p>
+                            <p className="text-gray-400">• Reduces concentration</p>
+                            <p className="text-gray-400">• Causes stress</p>
+                            <p className="text-gray-400">• Harder decisions</p>
+                        </div>
+
+                        {/* SOLUTION */}
+                        <div className="bg-[#1a1d24] p-8 rounded-2xl text-lg">
+                            <p className="text-white text-2xl mb-4">SOLUTION</p>
+
+                            {solutions.map((s) => (
+                                <label key={s.key} className="block mb-3">
+                                    <input type="checkbox" checked={activeSolutions.includes(s.key)} onChange={() => toggleSolution(s.key)} />{" "}
+                                    {s.text}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div style={styles.group}>
-            <h4 style={{ marginBottom: "4%" }}>{title}</h4>
-            <div style={styles.optionRow}>{children}</div>
-        </div>
-    );
-}
-
-function OptionCard({
-    label,
-    image,
-    checked,
-    onClick,
-    disabled,
-}: {
-    label: string;
-    image: string;
-    checked: boolean;
-    onClick: () => void;
-    disabled?: boolean;
-}) {
-    return (
-        <div
-            onClick={!disabled ? onClick : undefined}
-            style={{
-                ...styles.optionCard,
-                border: checked ? "2px solid #ff3c3c" : "1px solid #333",
-                opacity: disabled ? 0.4 : 1,
-                cursor: disabled ? "not-allowed" : "pointer",
-            }}
-        >
-            <div style={styles.imageWrapper}>
-                <img src={image} alt={label} style={styles.optionImage} />
-            </div>
-
-            <div style={styles.optionInfo}>
-                <div
-                    style={{
-                        ...styles.customCheckbox,
-                        backgroundColor: checked ? "#22c55e" : "transparent",
-                        borderColor: checked ? "#22c55e" : "#666",
-                    }}
-                >
-                    {checked && <span style={styles.checkMark}>✓</span>}
-                </div>
-
-                <span>{label}</span>
-            </div>
-        </div>
-    );
-}
-
-const styles: { [key: string]: React.CSSProperties } = {
-    page: {
-        background: "#0f0f0f",
-        minHeight: "100vh",
-        minWidth: "100vw",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        color: "#fff",
-        fontFamily: "sans-serif",
-        padding: "2%",
-    },
-
-    wrapper: {
-        display: "flex",
-        gap: "5%",
-        alignItems: "stretch",
-        width: "95%",
-        maxWidth: "1600px",
-    },
-
-    left: {
-        flex: 1,
-        background: "#1a1a1a",
-        padding: "3%",
-        borderRadius: "20px",
-    },
-
-    group: {
-        marginBottom: "6%",
-    },
-
-    optionRow: {
-        display: "flex",
-        gap: "4%",
-        flexWrap: "wrap",
-    },
-
-    optionCard: {
-        flex: 1,
-        minWidth: "45%",
-        display: "flex",
-        alignItems: "center",
-        gap: "5%",
-        padding: "3%",
-        borderRadius: "16px",
-        background: "#141414",
-        transition: "all 0.2s ease",
-    },
-
-    imageWrapper: {
-        width: "45%",
-        aspectRatio: "1 / 1",
-        background: "#B9CF9E",
-        borderRadius: "12px",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    optionImage: {
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-    },
-
-    optionInfo: {
-        display: "flex",
-        alignItems: "center",
-        gap: "10%",
-    },
-
-    customCheckbox: {
-        width: "1.6rem",
-        height: "1.6rem",
-        borderRadius: "6px",
-        border: "2px solid #666",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    checkMark: {
-        color: "#0f0f0f",
-        fontWeight: "bold",
-    },
-
-    right: {
-        flex: 1,
-        aspectRatio: "1 / 1",
-        background: "#B9CF9E",
-        borderRadius: "20px",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    resultImage: {
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-    },
-};
