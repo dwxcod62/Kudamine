@@ -10,10 +10,9 @@ const SETTINGS = {
         lifetime: 10000,
         max: 30,
 
-        // 👇 focus mode
-        focusInterval: 1200,
-        focusLifetime: 8000,
-        focusMax: 2,
+        focusInterval: 800,
+        focusLifetime: 10000,
+        focusMax: 10,
     },
 
     news: {
@@ -23,7 +22,7 @@ const SETTINGS = {
     },
 
     chaos: {
-        startDelay: 10000,
+        startDelay: 3000,
     },
 };
 
@@ -48,17 +47,29 @@ const solutions = [
 
 const rand = (min: number, max: number) => Math.random() * (max - min) + min;
 
-const scale = (v: number) => v / SETTINGS.intensity;
-
-/* ================= COMPONENT ================= */
-
-export default function LoginPage () {
+export default function LoginPage() {
     const [popups, setPopups] = useState<any[]>([]);
     const [news, setNews] = useState<any[]>([]);
     const [activeSolutions, setActiveSolutions] = useState<string[]>([]);
 
     const [started, setStarted] = useState(false);
     const [startChaos, setStartChaos] = useState(false);
+
+    const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+    /* ================= SCREEN DETECT ================= */
+
+    useEffect(() => {
+        const checkScreen = () => {
+            setIsSmallScreen(window.innerWidth < 1400);
+        };
+
+        checkScreen();
+        window.addEventListener("resize", checkScreen);
+        return () => window.removeEventListener("resize", checkScreen);
+    }, []);
+
+    /* ================= STATE ================= */
 
     const toggleSolution = (key: string) => {
         setActiveSolutions((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -73,10 +84,10 @@ export default function LoginPage () {
         setTimeout(() => setStartChaos(true), SETTINGS.chaos.startDelay);
     };
 
-    /* ================= CLEAR POPUPS WHEN SWITCH MODE ================= */
+    /* ================= RESET POPUPS ================= */
 
     useEffect(() => {
-        setPopups([]); // reset khi đổi mode
+        setPopups([]);
     }, [isFocus]);
 
     /* ================= POPUPS ================= */
@@ -84,11 +95,11 @@ export default function LoginPage () {
     useEffect(() => {
         if (!startChaos) return;
 
-        const popupInterval = isFocus ? SETTINGS.popup.focusInterval : scale(SETTINGS.popup.interval);
+        const popupInterval = isFocus ? SETTINGS.popup.focusInterval : SETTINGS.popup.interval;
 
-        const popupLifetime = isFocus ? SETTINGS.popup.focusLifetime : scale(SETTINGS.popup.lifetime);
+        const popupLifetime = isFocus ? SETTINGS.popup.focusLifetime : SETTINGS.popup.lifetime;
 
-        const popupMax = isFocus ? SETTINGS.popup.focusMax : SETTINGS.popup.max;
+        const popupMax = isFocus ? SETTINGS.popup.focusMax : isSmallScreen ? 15 : SETTINGS.popup.max;
 
         const interval = setInterval(() => {
             const isEnglish = isFocus ? true : isNoNoti ? true : Math.random() < 0.7;
@@ -97,12 +108,31 @@ export default function LoginPage () {
                 ? englishMessages[Math.floor(Math.random() * englishMessages.length)]
                 : spamMessages[Math.floor(Math.random() * spamMessages.length)];
 
+            const MIN_DISTANCE = isFocus ? 15 : 10;
+
+            let top = rand(10, 80);
+            let left = isFocus ? rand(10, 70) : rand(5, 85);
+
+            for (let i = 0; i < 10; i++) {
+                const isOverlap = popups.some((p) => {
+                    const dx = p.left - left;
+                    const dy = p.top - top;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    return distance < MIN_DISTANCE;
+                });
+
+                if (!isOverlap) break;
+
+                top = rand(10, 80);
+                left = isFocus ? rand(10, 70) : rand(5, 85);
+            }
+
             const popup = {
                 id: Math.random(),
                 text,
                 isEnglish,
-                top: rand(10, 80),
-                left: isFocus ? rand(30, 70) : rand(5, 85),
+                top,
+                left,
             };
 
             setPopups((prev) => [...prev.slice(-popupMax), popup]);
@@ -113,7 +143,7 @@ export default function LoginPage () {
         }, popupInterval);
 
         return () => clearInterval(interval);
-    }, [startChaos, activeSolutions]);
+    }, [startChaos, activeSolutions, isSmallScreen]);
 
     /* ================= NEWS ================= */
 
@@ -134,8 +164,8 @@ export default function LoginPage () {
 
             setTimeout(() => {
                 setNews((prev) => prev.filter((n) => n.id !== item.id));
-            }, scale(SETTINGS.news.lifetime));
-        }, scale(SETTINGS.news.interval));
+            }, SETTINGS.news.lifetime);
+        }, SETTINGS.news.interval);
 
         return () => clearInterval(interval);
     }, [startChaos, activeSolutions]);
@@ -143,15 +173,16 @@ export default function LoginPage () {
     /* ================= UI ================= */
 
     return (
-        <div className="relative min-h-screen bg-[#0f1115] overflow-hidden">
+        <div className="fixed inset-0 bg-[#0f1115] overflow-hidden">
+            {/* CHAOS */}
             {startChaos && (
                 <>
-                    {/* ===== BACKGROUND ===== */}
-                    <div className={`absolute inset-0 z-[1] transition-all duration-500 ${isFocus ? "opacity-10 blur-sm" : ""}`}>
+                    {/* NEWS */}
+                    <div className={`absolute inset-0 transition-all duration-500 ${isFocus ? "opacity-10 blur-sm" : ""}`}>
                         {news.map((n) => (
                             <div
                                 key={n.id}
-                                className="absolute bg-yellow-900/80 text-white p-2 rounded"
+                                className="absolute bg-yellow-900/80 text-white p-2 rounded text-sm"
                                 style={{
                                     top: `${n.top}vh`,
                                     left: `${n.left}vw`,
@@ -162,18 +193,15 @@ export default function LoginPage () {
                         ))}
                     </div>
 
-                    {/* ===== POPUP ===== */}
-                    <div className="absolute inset-0 z-[5] pointer-events-none">
+                    {/* POPUPS */}
+                    <div className="absolute inset-0 pointer-events-none">
                         {popups.map((p) => (
                             <div
                                 key={p.id}
                                 className={`
-                                    absolute rounded-2xl transition-all duration-700 ease-out
-                                    
+                                    absolute rounded-2xl transition-all duration-500
                                     ${p.isEnglish ? "bg-emerald-500 text-white" : "bg-[#1a1d24] text-gray-300"}
-
-                                    ${isFocus ? "scale-150 text-2xl font-semibold px-10 py-6 shadow-[0_0_60px_rgba(16,185,129,1)]" : "p-4"}
-
+                                    ${isFocus ? (isSmallScreen ? "text-lg px-6 py-4" : "scale-110 text-2xl px-10 py-6") : "p-3 text-sm"}
                                     ${isFocus && !p.isEnglish ? "hidden" : ""}
                                 `}
                                 style={{
@@ -188,39 +216,74 @@ export default function LoginPage () {
                 </>
             )}
 
-            {/* ===== START ===== */}
+            {/* START */}
             {!started && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <button onClick={handleStart} className="px-12 py-6 bg-white rounded-full text-xl text-black hover:scale-105 transition">
+                    <button onClick={handleStart} className="px-10 py-5 bg-white rounded-full text-lg text-black hover:scale-105 transition">
                         Start
                     </button>
                 </div>
             )}
 
-            {/* ===== MAIN CONTENT ===== */}
+            {/* MAIN */}
             {started && (
-                <div className="relative z-[10] flex flex-col items-center justify-center min-h-screen gap-12">
-                    <h1 className="text-5xl text-white/80">Information Overload</h1>
+                <div className="relative z-10 flex flex-col items-center justify-center min-h-screen gap-10 px-4">
+                    {/* TITLE */}
+                    <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white/90 text-center">Information Overload</h1>
 
-                    <div className="flex gap-16">
+                    {/* CONTENT */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 w-full max-w-4xl">
                         {/* WHY */}
-                        <div className="bg-[#1a1d24] p-8 rounded-2xl text-lg">
-                            <p className="text-white text-2xl mb-4">WHY</p>
-                            <p className="text-gray-400">• Reduces concentration</p>
-                            <p className="text-gray-400">• Causes stress</p>
-                            <p className="text-gray-400">• Harder decisions</p>
+                        <div className="bg-[#1a1d24] p-6 md:p-8 rounded-3xl border border-white/10 shadow-xl w-full h-full flex flex-col">
+                            <p className="text-white text-xl md:text-2xl font-semibold mb-4">WHY?</p>
+
+                            <div className="space-y-3 text-gray-300 text-sm md:text-base flex-1">
+                                <p className="flex items-center gap-3 bg-white/5 px-3 py-2 rounded-lg">
+                                    😵 <span>Causes stress and tiredness</span>
+                                </p>
+
+                                <p className="flex items-center gap-3 bg-white/5 px-3 py-2 rounded-lg">
+                                    🎯 <span>Hard to focus on one thing</span>
+                                </p>
+
+                                <p className="flex items-center gap-3 bg-white/5 px-3 py-2 rounded-lg">
+                                    🧠 <span>Easy to forget important information</span>
+                                </p>
+                            </div>
                         </div>
 
-                        {/* SOLUTION */}
-                        <div className="bg-[#1a1d24] p-8 rounded-2xl text-lg">
-                            <p className="text-white text-2xl mb-4">SOLUTION</p>
+                        {/* HOW */}
+                        <div className="bg-[#1a1d24] p-6 md:p-8 rounded-3xl border border-white/10 shadow-xl w-full h-full flex flex-col">
+                            <p className="text-white text-xl md:text-2xl font-semibold mb-4">HOW?</p>
 
-                            {solutions.map((s) => (
-                                <label key={s.key} className="block mb-3">
-                                    <input type="checkbox" checked={activeSolutions.includes(s.key)} onChange={() => toggleSolution(s.key)} />{" "}
-                                    {s.text}
-                                </label>
-                            ))}
+                            <div className="space-y-3 text-gray-300 text-sm md:text-base flex-1">
+                                {solutions.map((s) => {
+                                    const iconMap: any = {
+                                        sources: "🧹",
+                                        notifications: "🔕",
+                                        focus: "🎯",
+                                    };
+
+                                    return (
+                                        <label
+                                            key={s.key}
+                                            className="flex items-center gap-3 bg-white/5 px-3 py-2 rounded-lg cursor-pointer hover:bg-white/10 hover:text-white transition"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={activeSolutions.includes(s.key)}
+                                                onChange={() => toggleSolution(s.key)}
+                                                className="w-4 h-4 accent-emerald-500"
+                                            />
+
+                                            <span className="flex items-center gap-2">
+                                                <span>{iconMap[s.key]}</span>
+                                                <span>{s.text}</span>
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
