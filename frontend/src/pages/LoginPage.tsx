@@ -28,12 +28,73 @@ const SETTINGS = {
 
 /* ================= DATA ================= */
 
-const englishMessages = ["Learn 5 new words today", "Practice speaking for 10 minutes", "Repeat after native speakers", "Watch English videos daily"];
+const englishMessages = [
+  "Learn 5 new words today",
+  "Practice speaking for 10 minutes",
+  "Repeat after native speakers",
+  "Watch English videos daily",
+  "Write a short paragraph in English",
+  "Listen to English podcasts",
+  "Read an English article",
+  "Practice pronunciation with tongue twisters",
+  "Use new words in a sentence",
+  "Speak with a language partner",
+  "Think in English for 5 minutes",
+  "Review yesterday’s vocabulary",
+  "Describe your day in English",
+  "Learn one idiom today"
+];
 
-const spamMessages = ["Battery low!", "Update available", "Storage almost full"];
+const spamMessages = [
+  "Battery low!",
+  "Update available",
+  "Storage almost full",
+  "Your session expired",
+  "New login detected",
+  "Click here to claim reward",
+  "Limited time offer!",
+  "System alert: action required",
+  "You have unread notifications",
+  "Subscription expiring soon",
+  "Security warning!",
+  "Unknown device connected",
+  "Download failed",
+  "Connection unstable"
+];
 
-const realNews = ["Global markets fluctuate today"];
-const fakeNews = ["🔥 You won’t believe this!"];
+const realNews = [
+  "Global markets fluctuate today",
+  "Government announces new policy reforms",
+  "Scientists discover potential new treatment",
+  "Major tech company releases update",
+  "Climate change impacts increase globally",
+  "New education reforms introduced",
+  "Healthcare sector sees major improvements",
+  "International summit addresses global issues",
+  "Economic growth slows in several regions",
+  "Breakthrough in renewable energy technology",
+  "New transportation project launched",
+  "Unemployment rates show improvement",
+  "Researchers publish significant findings",
+  "Global trade tensions ease slightly"
+];
+
+const fakeNews = [
+  "🔥 You won’t believe this!",
+  "This trick will change your life forever!",
+  "Doctors hate this one secret!",
+  "Earn $1000 per day easily!",
+  "Miracle cure discovered overnight!",
+  "Shocking truth revealed!!!",
+  "Click now before it’s gone!",
+  "They don’t want you to know this!",
+  "Secret method exposed!",
+  "Instant results guaranteed!",
+  "Unbelievable transformation in 1 day!",
+  "Hidden hack finally revealed!",
+  "You’ve been doing it wrong!",
+  "This will blow your mind!"
+];
 
 /* ================= SOLUTIONS ================= */
 
